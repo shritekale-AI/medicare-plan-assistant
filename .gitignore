@@ -30,8 +30,10 @@ yarn-debug.log*
 yarn-error.log*
 .pnpm-debug.log*
 
-# env files (can opt-in for committing if needed)
+# env files — never commit real keys.
+# .env.example is deliberately tracked so the repo documents what is required.
 .env*
+!.env.example
 
 # vercel
 .vercel
