@@ -224,22 +224,32 @@ function ClientDetail({ assessment }: { assessment: ClientAssessment }) {
               </tr>
             </thead>
             <tbody>
+              {/* Arrow follows the NUMBER; colour carries the JUDGEMENT. They diverge
+                  on Part B giveback, where a smaller figure is worse for the client. */}
               {changes.map((c) => (
                 <tr key={c.label} className="border-b border-slate-100">
-                  <td className="py-2">{c.label}</td>
-                  <td className="py-2 text-slate-600">{c.from}</td>
+                  <td className="py-2 align-top">
+                    {c.label}
+                    {c.note && <div className="text-xs text-slate-500">{c.note}</div>}
+                  </td>
+                  <td className="py-2 align-top text-slate-600">{c.from}</td>
                   <td
-                    className={`py-2 font-medium ${
-                      c.direction === "better"
+                    className={`py-2 align-top font-medium ${
+                      c.impact === "better"
                         ? "text-emerald-800"
-                        : c.direction === "worse"
+                        : c.impact === "worse"
                           ? "text-red-800"
                           : "text-slate-600"
                     }`}
                   >
                     {c.to}
-                    {c.direction === "better" && " ↓"}
-                    {c.direction === "worse" && " ↑"}
+                    {c.movement === "down" && <span aria-hidden="true"> ↓</span>}
+                    {c.movement === "up" && <span aria-hidden="true"> ↑</span>}
+                    {c.impact !== "same" && (
+                      <span className="sr-only">
+                        {c.impact === "better" ? " — better for the client" : " — worse for the client"}
+                      </span>
+                    )}
                   </td>
                 </tr>
               ))}

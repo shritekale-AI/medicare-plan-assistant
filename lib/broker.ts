@@ -42,12 +42,31 @@ const DISCONTINUED = new Set(book.meta.discontinuedPlanIds);
 
 export type Triage = "clear_port" | "needs_review" | "no_options" | "unaffected";
 
+/**
+ * A change row separates two things that are easy to conflate:
+ *
+ *   movement — which way the NUMBER went
+ *   impact   — whether that is GOOD OR BAD for the client
+ *
+ * For most fields these agree: premiums, deductibles and copays going down is both
+ * a decrease and an improvement. Part B giveback inverts it — the plan pays part of
+ * the client's Part B premium, so a SMALLER number is WORSE for them.
+ *
+ * Collapsing these into one field produced a genuinely misleading row: giveback
+ * falling from $117 to $94 was correctly flagged as worse, but rendered with an up
+ * arrow beside a number that had gone down. Keeping them separate lets the arrow
+ * follow the number and the colour carry the judgement.
+ */
 export type ChangeRow = {
   label: string;
   from: string;
   to: string;
-  /** better = improves for the client, worse = costs them, same = unchanged */
-  direction: "better" | "worse" | "same";
+  /** Drives colour. */
+  impact: "better" | "worse" | "same";
+  /** Drives the arrow. "none" for non-numeric fields, where an arrow is meaningless. */
+  movement: "up" | "down" | "same" | "none";
+  /** Plain language, for rows where the number alone could mislead. */
+  note?: string;
 };
 
 export type ClientAssessment = {
@@ -69,10 +88,45 @@ function money(n: number | null | undefined): string {
   return `$${n.toLocaleString()}`;
 }
 
-/** Lower is better for every field compared here. */
-function direction(from: number, to: number): ChangeRow["direction"] {
+function movementOf(from: number, to: number): ChangeRow["movement"] {
   if (to === from) return "same";
-  return to < from ? "better" : "worse";
+  return to > from ? "up" : "down";
+}
+
+/** For costs — premium, deductible, copay, out-of-pocket — lower is better. */
+function costRow(label: string, from: number, to: number): ChangeRow {
+  return {
+    label,
+    from: money(from),
+    to: money(to),
+    impact: to === from ? "same" : to < from ? "better" : "worse",
+    movement: movementOf(from, to),
+  };
+}
+
+/**
+ * Part B giveback is the one inverted field: the plan pays part of the client's Part B
+ * premium, so a SMALLER number means LESS money back — worse for them, even though
+ * the figure has gone down. Spelled out in the note, because a dollar amount falling
+ * reads as good news to almost everyone.
+ */
+function givebackRow(from: number, to: number): ChangeRow {
+  const fmt = (n: number) => (n > 0 ? `${money(n)}/mo` : "None");
+  const delta = Math.abs(to - from);
+
+  let note: string | undefined;
+  if (to < from) note = `${money(delta)}/mo less back toward their Part B premium`;
+  else if (to > from) note = `${money(delta)}/mo more back toward their Part B premium`;
+
+  return {
+    label: "Part B giveback",
+    from: fmt(from),
+    to: fmt(to),
+    // Higher giveback is better — the impact is the reverse of the movement.
+    impact: to === from ? "same" : to > from ? "better" : "worse",
+    movement: movementOf(from, to),
+    note,
+  };
 }
 
 /**
@@ -185,48 +239,24 @@ export function assessClient(client: Client): ClientAssessment {
 
   const changes: ChangeRow[] = currentPlan
     ? [
-        {
-          label: "Monthly premium",
-          from: money(currentPlan.monthlyPremium),
-          to: money(best.monthlyPremium),
-          direction: direction(currentPlan.monthlyPremium, best.monthlyPremium),
-        },
-        {
-          label: "Max out-of-pocket",
-          from: money(currentPlan.maxOutOfPocket),
-          to: money(best.maxOutOfPocket),
-          direction: direction(currentPlan.maxOutOfPocket, best.maxOutOfPocket),
-        },
-        {
-          label: "Specialist copay",
-          from: money(currentPlan.specialistCopay),
-          to: money(best.specialistCopay),
-          direction: direction(currentPlan.specialistCopay, best.specialistCopay),
-        },
-        {
-          label: "Medical deductible",
-          from: money(currentPlan.medicalDeductible),
-          to: money(best.medicalDeductible),
-          direction: direction(currentPlan.medicalDeductible, best.medicalDeductible),
-        },
-        {
-          label: "Drug deductible",
-          from: money(currentPlan.rxDeductible),
-          to: money(best.rxDeductible),
-          direction: direction(currentPlan.rxDeductible ?? 0, best.rxDeductible ?? 0),
-        },
+        costRow("Monthly premium", currentPlan.monthlyPremium, best.monthlyPremium),
+        costRow("Max out-of-pocket", currentPlan.maxOutOfPocket, best.maxOutOfPocket),
+        costRow("Specialist copay", currentPlan.specialistCopay, best.specialistCopay),
+        costRow("Medical deductible", currentPlan.medicalDeductible, best.medicalDeductible),
+        costRow("Drug deductible", currentPlan.rxDeductible ?? 0, best.rxDeductible ?? 0),
         {
           label: "Network type",
           from: currentPlan.networkType,
           to: best.networkType,
-          direction: best.networkType === currentPlan.networkType ? "same" : "worse",
+          impact: best.networkType === currentPlan.networkType ? "same" : "worse",
+          // Not a quantity — an arrow here would imply a magnitude that doesn't exist.
+          movement: "none",
+          note:
+            best.networkType === currentPlan.networkType
+              ? undefined
+              : "Different network — confirm their providers are covered",
         },
-        {
-          label: "Part B giveback",
-          from: currentPlan.partBGiveback ? `${money(currentPlan.partBGiveback)}/mo` : "None",
-          to: best.partBGiveback ? `${money(best.partBGiveback)}/mo` : "None",
-          direction: direction(-(currentPlan.partBGiveback ?? 0), -(best.partBGiveback ?? 0)),
-        },
+        givebackRow(currentPlan.partBGiveback ?? 0, best.partBGiveback ?? 0),
       ]
     : [];
 
