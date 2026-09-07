@@ -35,6 +35,8 @@ export type Client = {
   preferredNetwork: string;
   doctors: string[];
   lastContact: string;
+  phone?: string;
+  bestTimeToCall?: string;
 };
 
 export const CLIENTS = book.clients as Client[];

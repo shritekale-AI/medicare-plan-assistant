@@ -182,6 +182,7 @@ export default function BrokerPage() {
                           {a.client.currentPlanId} · {a.client.medicationCount} medication
                           {a.client.medicationCount === 1 ? "" : "s"}
                           {a.client.doctors.length > 0 && ` · ${a.client.doctors.length} named provider(s)`}
+                          {a.client.phone && ` · ${a.client.phone}`}
                         </div>
                       </button>
                     </li>
@@ -256,11 +257,33 @@ function ClientDetail({ assessment }: { assessment: ClientAssessment }) {
   return (
     <div className="rounded-xl border border-slate-200 bg-white">
       <div className="border-b border-slate-200 px-5 py-4">
-        <h2 className="text-lg font-semibold">{client.name}</h2>
-        <p className="text-sm text-slate-600">
-          {client.age} · {client.zip} · last contacted {client.lastContact}
-        </p>
-        <p className="mt-1 text-sm">{assessment.headline}</p>
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <h2 className="text-lg font-semibold">{client.name}</h2>
+            <p className="text-sm text-slate-600">
+              {client.age} · {client.zip} · last contacted {client.lastContact}
+            </p>
+            <p className="mt-1 text-sm">{assessment.headline}</p>
+          </div>
+
+          {/* The point of the whole surface is that Tony has to phone sixty people.
+              The number belongs next to the name, not buried in a record somewhere. */}
+          {client.phone && (
+            <div className="text-right">
+              <a
+                href={`tel:${client.phone.replace(/[^\d+]/g, "")}`}
+                className="inline-block rounded-lg bg-emerald-800 px-4 py-2 font-medium text-white focus:outline-none focus:ring-4 focus:ring-emerald-300"
+              >
+                Call {client.phone}
+              </a>
+              {client.bestTimeToCall && (
+                <div className="mt-1 text-xs text-slate-600">
+                  Prefers {client.bestTimeToCall}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
       </div>
 
       {blockers.length > 0 && (

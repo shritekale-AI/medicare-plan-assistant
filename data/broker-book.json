@@ -1,12 +1,22 @@
 {
   "meta": {
-    "broker": { "name": "Tony", "agentId": "SAN-4471", "market": "Mecklenburg County, NC" },
+    "broker": {
+      "name": "Tony",
+      "agentId": "SAN-4471",
+      "market": "Mecklenburg County, NC"
+    },
     "planYear": 2026,
     "generatedAt": "2026-09-07",
     "synthetic": true,
     "note": "Entirely fictional clients created for demonstration. No real people, no PHI. Names, conditions, and medications are invented.",
     "modellingSimplification": "Humana has announced 2027 exits but has not published which plans or counties. This models a plausible exit set drawn from the 2026 plans in the dataset, and treats the remaining 2026 plans as stand-ins for 2027 offerings. The triage logic is real; the specific exit list is illustrative.",
-    "discontinuedPlanIds": ["H1036-318", "H5525-035", "H1036-331", "H8145-004"]
+    "discontinuedPlanIds": [
+      "H1036-318",
+      "H5525-035",
+      "H1036-331",
+      "H8145-004"
+    ],
+    "contactNote": "Phone numbers use the 555-01xx range reserved for fiction. No real numbers."
   },
   "clients": [
     {
@@ -20,8 +30,12 @@
       "medicationCount": 3,
       "chronicConditions": [],
       "preferredNetwork": "HMO",
-      "doctors": ["Dr. Reddy (cardiology)"],
-      "lastContact": "2026-08-14"
+      "doctors": [
+        "Dr. Reddy (cardiology)"
+      ],
+      "lastContact": "2026-08-14",
+      "phone": "(704) 555-0142",
+      "bestTimeToCall": "morning"
     },
     {
       "id": "C-1067",
@@ -34,8 +48,12 @@
       "medicationCount": 5,
       "chronicConditions": [],
       "preferredNetwork": "HMO",
-      "doctors": ["Dr. Ellis (primary care)"],
-      "lastContact": "2026-07-02"
+      "doctors": [
+        "Dr. Ellis (primary care)"
+      ],
+      "lastContact": "2026-07-02",
+      "phone": "(704) 555-0167",
+      "bestTimeToCall": "afternoon"
     },
     {
       "id": "C-1088",
@@ -48,8 +66,13 @@
       "medicationCount": 2,
       "chronicConditions": [],
       "preferredNetwork": "PPO",
-      "doctors": ["Dr. Nakamura (endocrinology)", "Dr. Ellis (primary care)"],
-      "lastContact": "2026-08-29"
+      "doctors": [
+        "Dr. Nakamura (endocrinology)",
+        "Dr. Ellis (primary care)"
+      ],
+      "lastContact": "2026-08-29",
+      "phone": "(704) 555-0188",
+      "bestTimeToCall": "morning"
     },
     {
       "id": "C-1103",
@@ -63,7 +86,9 @@
       "chronicConditions": [],
       "preferredNetwork": "PPO",
       "doctors": [],
-      "lastContact": "2026-06-19"
+      "lastContact": "2026-06-19",
+      "phone": "(704) 555-0103",
+      "bestTimeToCall": "evening"
     },
     {
       "id": "C-1119",
@@ -76,8 +101,12 @@
       "medicationCount": 6,
       "chronicConditions": [],
       "preferredNetwork": "HMO",
-      "doctors": ["Dr. Ellis (primary care)"],
-      "lastContact": "2026-08-30"
+      "doctors": [
+        "Dr. Ellis (primary care)"
+      ],
+      "lastContact": "2026-08-30",
+      "phone": "(704) 555-0119",
+      "bestTimeToCall": "afternoon"
     },
     {
       "id": "C-1124",
@@ -91,7 +120,9 @@
       "chronicConditions": [],
       "preferredNetwork": "HMO",
       "doctors": [],
-      "lastContact": "2026-05-11"
+      "lastContact": "2026-05-11",
+      "phone": "(704) 555-0124",
+      "bestTimeToCall": "morning"
     },
     {
       "id": "C-1141",
@@ -102,10 +133,18 @@
       "hasMedicaid": false,
       "takesPrescriptions": true,
       "medicationCount": 8,
-      "chronicConditions": ["diabetes", "chronic heart failure"],
+      "chronicConditions": [
+        "diabetes",
+        "chronic heart failure"
+      ],
       "preferredNetwork": "PFFS",
-      "doctors": ["Dr. Reddy (cardiology)", "Dr. Nakamura (endocrinology)"],
-      "lastContact": "2026-09-01"
+      "doctors": [
+        "Dr. Reddy (cardiology)",
+        "Dr. Nakamura (endocrinology)"
+      ],
+      "lastContact": "2026-09-01",
+      "phone": "(704) 555-0141",
+      "bestTimeToCall": "morning"
     },
     {
       "id": "C-1156",
@@ -119,7 +158,9 @@
       "chronicConditions": [],
       "preferredNetwork": "PFFS",
       "doctors": [],
-      "lastContact": "2026-04-27"
+      "lastContact": "2026-04-27",
+      "phone": "(704) 555-0156",
+      "bestTimeToCall": "afternoon"
     },
     {
       "id": "C-1158",
@@ -132,9 +173,13 @@
       "medicationCount": 4,
       "chronicConditions": [],
       "preferredNetwork": "HMO",
-      "doctors": ["Dr. Ellis (primary care)"],
+      "doctors": [
+        "Dr. Ellis (primary care)"
+      ],
       "lastContact": "2026-03-30",
-      "note": "Moved across the state line to Fort Mill SC in spring — address change not yet reflected in the plan record"
+      "note": "Moved across the state line to Fort Mill SC in spring — address change not yet reflected in the plan record",
+      "phone": "(803) 555-0158",
+      "bestTimeToCall": "morning"
     },
     {
       "id": "C-1160",
@@ -149,7 +194,9 @@
       "preferredNetwork": "PFFS",
       "doctors": [],
       "lastContact": "2026-02-18",
-      "note": "Relocated to Union County"
+      "note": "Relocated to Union County",
+      "phone": "(704) 555-0160",
+      "bestTimeToCall": "evening"
     },
     {
       "id": "C-1162",
@@ -162,8 +209,12 @@
       "medicationCount": 2,
       "chronicConditions": [],
       "preferredNetwork": "HMO",
-      "doctors": ["Dr. Ellis (primary care)"],
-      "lastContact": "2026-08-22"
+      "doctors": [
+        "Dr. Ellis (primary care)"
+      ],
+      "lastContact": "2026-08-22",
+      "phone": "(704) 555-0162",
+      "bestTimeToCall": "afternoon"
     },
     {
       "id": "C-1177",
@@ -176,8 +227,12 @@
       "medicationCount": 3,
       "chronicConditions": [],
       "preferredNetwork": "PPO",
-      "doctors": ["Dr. Reddy (cardiology)"],
-      "lastContact": "2026-08-05"
+      "doctors": [
+        "Dr. Reddy (cardiology)"
+      ],
+      "lastContact": "2026-08-05",
+      "phone": "(704) 555-0177",
+      "bestTimeToCall": "morning"
     }
   ]
 }
