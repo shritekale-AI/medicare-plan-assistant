@@ -22,6 +22,8 @@ const TOOL_LABELS: Record<string, string> = {
   compare_plans: "Compared plans",
   estimate_annual_cost: "Estimated annual cost",
   search_plan_documents: "Searched official plan documents",
+  check_provider_network: "Checked provider network status",
+  find_plans_keeping_providers: "Checked which plans keep their doctors",
   create_handoff_summary: "Prepared handoff to a human advocate",
   compact_conversation: "Summarised earlier conversation (smaller model)",
 };
@@ -32,6 +34,9 @@ const DETERMINISTIC = new Set([
   "get_plan_details",
   "compare_plans",
   "estimate_annual_cost",
+  // Network status is a lookup, not a retrieval — a value in a table, like a premium.
+  "check_provider_network",
+  "find_plans_keeping_providers",
 ]);
 
 export function TracePanel({ trace }: { trace: TraceEntry[] }) {

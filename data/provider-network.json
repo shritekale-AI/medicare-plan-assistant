@@ -1,0 +1,107 @@
+{
+  "meta": {
+    "synthetic": true,
+    "warning": "SYNTHETIC DATA. These providers do not exist. NPIs are invented and do not correspond to real registry entries. Network membership is fabricated to exercise the lookup path, not sourced from Humana.",
+    "whyThisExists": "Provider network status is the deciding factor in almost every plan choice — 'does it keep my doctor' is the question the whole product is built around. Humana serves that data through a live lookup rather than a downloadable directory, so there is no public file to ingest. This stands in for that API and makes the integration seam explicit rather than leaving a hole.",
+    "productionReplacement": "A call to Humana's provider directory service, keyed on plan ID and NPI, returning network status plus an effective date.",
+    "lastNetworkUpdate": "2026-08-28",
+    "stalenessNote": "Humana's own plan finder displays a 'Last Network Update' date because networks change continuously. Any cached copy goes stale within weeks, which is why network status must always be re-confirmed at enrollment — never treated as settled by a lookup.",
+    "county": "Mecklenburg",
+    "state": "NC"
+  },
+  "providers": [
+    {
+      "npi": "1902847361",
+      "name": "Dr. Anjali Reddy",
+      "searchNames": ["reddy", "anjali reddy", "dr reddy"],
+      "specialty": "Cardiology",
+      "practice": "Queen City Heart Associates",
+      "city": "Charlotte, NC",
+      "acceptingNewPatients": true,
+      "inNetworkPlans": [
+        "H5216-017", "H5525-035", "H5525-050", "H5525-083", "H5525-070",
+        "H5216-211", "H5525-065", "H5216-343", "H5525-036", "H5525-072",
+        "R0110-005", "R0110-006", "R0110-004", "H8145-004",
+        "H1036-318", "H1036-335-002", "H1036-308"
+      ]
+    },
+    {
+      "npi": "1558203947",
+      "name": "Dr. Marcus Ellis",
+      "searchNames": ["ellis", "marcus ellis", "dr ellis"],
+      "specialty": "Primary Care",
+      "practice": "Providence Family Medicine",
+      "city": "Charlotte, NC",
+      "acceptingNewPatients": true,
+      "inNetworkPlans": [
+        "H1036-318", "H1036-335-002", "H1036-137", "H1036-331", "H1036-167",
+        "H1036-307", "H1036-308", "H5216-017", "H5525-035", "H5525-050",
+        "H5525-083", "H5525-070", "H5216-211", "H5525-065", "H5216-343",
+        "H5525-036", "H5525-072", "R0110-005", "R0110-006", "R0110-004", "H8145-004"
+      ]
+    },
+    {
+      "npi": "1734096218",
+      "name": "Dr. Kenji Nakamura",
+      "searchNames": ["nakamura", "kenji nakamura", "dr nakamura"],
+      "specialty": "Endocrinology",
+      "practice": "Carolina Diabetes & Endocrine",
+      "city": "Matthews, NC",
+      "acceptingNewPatients": false,
+      "inNetworkPlans": [
+        "H5216-017", "H5525-035", "H5525-050", "H5216-211",
+        "H1036-335-002", "H1036-308", "R0110-005"
+      ]
+    },
+    {
+      "npi": "1289450173",
+      "name": "Dr. Patricia Osei",
+      "searchNames": ["osei", "patricia osei", "dr osei"],
+      "specialty": "Primary Care",
+      "practice": "Ballantyne Internal Medicine",
+      "city": "Charlotte, NC",
+      "acceptingNewPatients": true,
+      "inNetworkPlans": [
+        "H1036-318", "H1036-137", "H1036-331", "H1036-167", "H1036-307",
+        "H5216-017", "H5525-050", "H5525-070"
+      ]
+    },
+    {
+      "npi": "1671308542",
+      "name": "Dr. Samuel Boateng",
+      "searchNames": ["boateng", "samuel boateng", "dr boateng"],
+      "specialty": "Nephrology",
+      "practice": "Piedmont Kidney Care",
+      "city": "Charlotte, NC",
+      "acceptingNewPatients": true,
+      "inNetworkPlans": ["H1036-335-002", "H5525-050", "H5216-017", "R0110-004"]
+    },
+    {
+      "npi": "1445927806",
+      "name": "Novant Health Presbyterian Medical Center",
+      "searchNames": ["presbyterian", "novant presbyterian", "presbyterian medical center"],
+      "specialty": "Hospital",
+      "practice": "Novant Health",
+      "city": "Charlotte, NC",
+      "acceptingNewPatients": true,
+      "inNetworkPlans": [
+        "H1036-318", "H1036-335-002", "H1036-137", "H1036-308",
+        "H5216-017", "H5525-035", "H5525-050", "H5525-083",
+        "R0110-005", "R0110-004", "H8145-004"
+      ]
+    },
+    {
+      "npi": "1023876459",
+      "name": "Atrium Health Carolinas Medical Center",
+      "searchNames": ["atrium", "carolinas medical center", "atrium health"],
+      "specialty": "Hospital",
+      "practice": "Atrium Health",
+      "city": "Charlotte, NC",
+      "acceptingNewPatients": true,
+      "inNetworkPlans": [
+        "H5216-017", "H5216-211", "H5216-343", "H5525-035", "H5525-050",
+        "H5525-070", "H5525-083", "R0110-005", "R0110-006"
+      ]
+    }
+  ]
+}

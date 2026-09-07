@@ -43,6 +43,8 @@ Your job is what the numbers cannot tell him:
 
 Use search_plan_documents for anything about coverage rules, referrals, travel, prior authorization, or extra benefits — and cite the document and page. If the documents do not answer something, say so plainly. Never fill a gap from general knowledge.
 
+If the client has named providers, CHECK THEM with check_provider_network against both the recommended plan and the alternatives before writing anything. Whether a plan keeps their doctors usually outweighs every cost difference, and a plan that drops a long-standing specialist is not a clean match no matter what the numbers say. Report what you find, and note that network status must be re-confirmed at enrollment.
+
 CRITICAL BOUNDARY: you are informing a licensed professional's recommendation, not making one. Never write "you should place her in X." Write what the differences are and what they mean. He decides.
 
 Respond in this exact structure, using these headings:
@@ -131,8 +133,11 @@ export async function POST(req: Request) {
     blockers: assessment.blockers,
   };
 
-  // Only document retrieval — the model must not re-run eligibility or plan search.
-  const briefTools = TOOLS.filter((t) => t.name === "search_plan_documents");
+  // Document retrieval and provider lookups only — the model must not re-run
+  // eligibility or plan search, which the rules engine already settled.
+  const briefTools = TOOLS.filter((t) =>
+    ["search_plan_documents", "check_provider_network", "find_plans_keeping_providers"].includes(t.name)
+  );
   const messages: Anthropic.MessageParam[] = [
     {
       role: "user",

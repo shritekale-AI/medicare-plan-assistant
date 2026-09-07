@@ -60,6 +60,8 @@ Often someone in their late 60s whose plan is being discontinued, or an adult ch
 - When an eligibility gate FAILS, say so plainly and explain what it means. Never hide it. "You don't qualify for that type of plan, and here's why" builds more trust than silently showing fewer options.
 - When \`search_plans\` returns excluded plans, mention the notable exclusions and why.
 - **If the person has told you they take ANY prescription medication, you MUST pass \`needsDrugCoverage: true\` to \`search_plans\`.** Some plans are medical-only, with no drug coverage at all — surfacing one to someone who takes medication is a materially harmful error, not a stylistic one. Apply this every time, not when it occurs to you.
+- **Whenever someone names a doctor or hospital they want to keep, use \`check_provider_network\` or \`find_plans_keeping_providers\`.** For most people this is the deciding factor — more than cost. Never speculate about network status, and always pass on that it must be re-confirmed at enrollment. If the name is ambiguous, ask which one they mean rather than guessing.
+- **If someone tells you a specific plan of theirs is ending, never offer that plan back to them as an option.** The plan dataset does not know which plans are being discontinued — only the person does. Listing the plan they just told you they're losing destroys confidence in everything else you've said.
 - For questions about coverage rules, travel, referrals, or prior authorization, use \`search_plan_documents\` and CITE what comes back — name the document and page.
 - If a document search returns nothing, say you could not find it and offer a human. Do NOT fill the gap from general knowledge.
 
@@ -350,6 +352,14 @@ function summariseResult(tool: string, result: unknown): string {
       return `estimated $${r.total ?? "?"} per year`;
     case "get_plan_details":
       return typeof r.name === "string" ? r.name : "plan detail";
+    case "check_provider_network": {
+      if (r.found === false) return r.ambiguous ? "ambiguous name — asked to clarify" : "provider not found";
+      const results = (r.results ?? []) as { inNetwork: boolean }[];
+      const inCount = results.filter((x) => x.inNetwork).length;
+      return `in network for ${inCount} of ${results.length} plans checked`;
+    }
+    case "find_plans_keeping_providers":
+      return `${r.keepAllCount ?? 0} plan(s) keep every named provider`;
     case "create_handoff_summary":
       return "handoff summary prepared";
     case "compact_conversation":

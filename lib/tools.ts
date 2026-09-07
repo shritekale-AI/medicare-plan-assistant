@@ -23,6 +23,7 @@ import {
   PLAN_META,
 } from "./plans";
 import { searchPlanDocuments } from "./retrieval";
+import { checkNetwork, plansKeepingAll, NETWORK_META } from "./providers";
 
 export const TOOLS: Anthropic.Tool[] = [
   {
@@ -129,6 +130,39 @@ export const TOOLS: Anthropic.Tool[] = [
     },
   },
   {
+    name: "check_provider_network",
+    description:
+      "Check whether a named doctor, specialist, or hospital is in network for one or more plans. Call this WHENEVER someone names a provider they want to keep — it is usually the single most important factor in their decision, and the structured answer is far more reliable than anything in the plan documents. Returns per-plan in/out status. If the name is ambiguous, it returns the candidates instead of guessing; ask which one they mean. Always pass on the caveat that network status must be re-confirmed at enrollment.",
+    input_schema: {
+      type: "object",
+      properties: {
+        providerName: {
+          type: "string",
+          description: "Name as the person said it, e.g. 'Dr. Reddy' or 'Nakamura' or 'Atrium'",
+        },
+        planIds: {
+          type: "array",
+          items: { type: "string" },
+          description: "Plans to check against, e.g. ['H1036-318','H5216-017']",
+        },
+      },
+      required: ["providerName", "planIds"],
+    },
+  },
+  {
+    name: "find_plans_keeping_providers",
+    description:
+      "Given several named providers and a set of candidate plans, return which plans keep ALL of them and which providers each plan would drop. Use this to narrow options when someone names more than one doctor they want to keep — it answers in one call what would otherwise take a separate check per doctor per plan.",
+    input_schema: {
+      type: "object",
+      properties: {
+        providerNames: { type: "array", items: { type: "string" } },
+        planIds: { type: "array", items: { type: "string" } },
+      },
+      required: ["providerNames", "planIds"],
+    },
+  },
+  {
     name: "create_handoff_summary",
     description:
       "Build a structured summary to hand to a licensed Humana advocate when the person wants to speak to a human, or when a decision needs a licensed recommendation. Call this whenever they express hesitation, ask to talk to someone, or reach the point of enrolling.",
@@ -206,6 +240,38 @@ export async function executeTool(name: string, input: Record<string, unknown>):
 
     case "search_plan_documents": {
       return await searchPlanDocuments(input.planId as string, input.query as string);
+    }
+
+    case "check_provider_network": {
+      const result = checkNetwork(input.providerName as string, (input.planIds as string[]) ?? []);
+      if (result.notFound) {
+        return {
+          found: false,
+          message: `No provider matching "${input.providerName}" in this demonstration dataset. Say you could not check it rather than assuming either way.`,
+          dataNote: NETWORK_META.warning,
+        };
+      }
+      if (result.ambiguous.length > 0) {
+        return {
+          found: false,
+          ambiguous: result.ambiguous,
+          message: "Several providers match that name. Ask which one they mean — do not guess.",
+        };
+      }
+      return { found: true, results: result.matched, dataNote: NETWORK_META.warning };
+    }
+
+    case "find_plans_keeping_providers": {
+      const rows = plansKeepingAll(
+        (input.providerNames as string[]) ?? [],
+        (input.planIds as string[]) ?? []
+      );
+      return {
+        plans: rows,
+        keepAllCount: rows.filter((r) => r.keepsAll).length,
+        lastNetworkUpdate: NETWORK_META.lastNetworkUpdate,
+        dataNote: NETWORK_META.warning,
+      };
     }
 
     case "create_handoff_summary": {
