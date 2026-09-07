@@ -43,8 +43,19 @@ export default function Home() {
   const [voiceMode, setVoiceMode] = useState(false);
   const [showTrace, setShowTrace] = useState(true);
 
+  const [build, setBuild] = useState<{ commit: string; corpusVersion: string } | null>(null);
+
   const { listening, speaking, supported, listen, stopListening, speak, stopSpeaking } = useSpeech();
   const endRef = useRef<HTMLDivElement>(null);
+
+  // Surfaces which commit and corpus version are actually running, so "is the live
+  // link current?" can be answered by looking rather than assuming.
+  useEffect(() => {
+    fetch("/api/health")
+      .then((r) => r.json())
+      .then((d) => setBuild({ commit: d.deployment.commit, corpusVersion: d.corpus.version }))
+      .catch(() => {});
+  }, []);
 
   useEffect(() => {
     // Respect prefers-reduced-motion: smooth auto-scroll can trigger discomfort for
@@ -124,6 +135,12 @@ export default function Home() {
             <h1 className="text-xl font-semibold">Medicare Plan Assistant</h1>
             <p className="text-sm text-slate-600">
               21 plans · Mecklenburg County, NC (28270) · plan year 2026
+              {build && (
+                <span className="text-slate-500">
+                  {" "}· build <code className="font-mono">{build.commit}</code> · corpus{" "}
+                  <code className="font-mono">{build.corpusVersion.slice(0, 8)}</code>
+                </span>
+              )}
             </p>
           </div>
           <label className="flex cursor-pointer items-center gap-2 text-sm">
