@@ -72,7 +72,8 @@ export const TOOLS: Anthropic.Tool[] = [
         },
         needsDrugCoverage: {
           type: "boolean",
-          description: "True if they take prescriptions — excludes medical-only plans",
+          description:
+            "REQUIRED to be true whenever the person has mentioned taking any prescription medication. Several plans in this dataset are medical-only with no Part D coverage; returning one to someone who takes medication is a materially harmful error. Do not omit this.",
         },
         maxMonthlyPremium: { type: "number" },
       },
