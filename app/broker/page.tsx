@@ -1,8 +1,42 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { assessBook, BOOK_META, type ClientAssessment, type Triage } from "@/lib/broker";
+import {
+  assessBook,
+  buildChanges,
+  compareToRecommended,
+  BOOK_META,
+  type ClientAssessment,
+  type Triage,
+} from "@/lib/broker";
+import { documentUrls, type Plan } from "@/lib/plans";
+import { RichText } from "@/components/RichText";
+
+/** Links to the official filed documents, so the broker can read the source himself. */
+function PlanDocs({ plan }: { plan: Plan }) {
+  const docs = documentUrls(plan);
+  return (
+    <div className="mt-2 flex gap-3 text-sm">
+      <a
+        href={docs.summaryOfBenefits}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="text-emerald-800 underline"
+      >
+        Summary of Benefits
+      </a>
+      <a
+        href={docs.evidenceOfCoverage}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="text-emerald-800 underline"
+      >
+        Evidence of Coverage
+      </a>
+    </div>
+  );
+}
 
 /**
  * The broker surface — Tony's book of business.
@@ -177,7 +211,47 @@ export default function BrokerPage() {
 }
 
 function ClientDetail({ assessment }: { assessment: ClientAssessment }) {
-  const { client, currentPlan, recommended, changes, reasoning, blockers, alternatives } = assessment;
+  const { client, currentPlan, recommended, reasoning, blockers, alternatives } = assessment;
+
+  // Which plan the comparison table is showing. Defaults to the recommendation, but
+  // the broker can pin any alternative against the same baseline.
+  const [viewing, setViewing] = useState<Plan | undefined>(recommended);
+  const [brief, setBrief] = useState<string | null>(null);
+  const [briefing, setBriefing] = useState(false);
+  const [briefError, setBriefError] = useState<string | null>(null);
+
+  // Reset when a different client is selected.
+  useEffect(() => {
+    setViewing(recommended);
+    setBrief(null);
+    setBriefError(null);
+  }, [client.id, recommended]);
+
+  const changes = useMemo(
+    () => (currentPlan && viewing ? buildChanges(currentPlan, viewing) : []),
+    [currentPlan, viewing]
+  );
+
+  async function generateBrief() {
+    setBriefing(true);
+    setBriefError(null);
+    try {
+      const res = await fetch("/api/broker/brief", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ clientId: client.id }),
+      });
+      const data = await res.json();
+      if (!res.ok) setBriefError(data.message ?? "Could not generate the briefing.");
+      else setBrief(data.brief);
+    } catch {
+      setBriefError("Could not reach the briefing service.");
+    } finally {
+      setBriefing(false);
+    }
+  }
+
+  const isAlternative = viewing && recommended && viewing.planId !== recommended.planId;
 
   return (
     <div className="rounded-xl border border-slate-200 bg-white">
@@ -200,18 +274,30 @@ function ClientDetail({ assessment }: { assessment: ClientAssessment }) {
         </div>
       )}
 
-      {currentPlan && recommended && (
+      {currentPlan && recommended && viewing && (
         <div className="px-5 py-4">
           <div className="mb-3 grid grid-cols-2 gap-3 text-sm">
             <div className="rounded-lg bg-slate-100 p-3">
               <div className="text-slate-500">Ending</div>
               <div className="font-medium">{currentPlan.name}</div>
               <div className="text-slate-600">{currentPlan.planId}</div>
+              <PlanDocs plan={currentPlan} />
             </div>
-            <div className="rounded-lg bg-emerald-50 p-3">
-              <div className="text-slate-500">Recommended</div>
-              <div className="font-medium">{recommended.name}</div>
-              <div className="text-slate-600">{recommended.planId}</div>
+            <div className={`rounded-lg p-3 ${isAlternative ? "bg-sky-50" : "bg-emerald-50"}`}>
+              <div className="text-slate-500">
+                {isAlternative ? "Alternative (comparing)" : "Recommended"}
+              </div>
+              <div className="font-medium">{viewing.name}</div>
+              <div className="text-slate-600">{viewing.planId}</div>
+              <PlanDocs plan={viewing} />
+              {isAlternative && (
+                <button
+                  onClick={() => setViewing(recommended)}
+                  className="mt-2 text-sm text-emerald-800 underline"
+                >
+                  ← Back to recommended
+                </button>
+              )}
             </div>
           </div>
 
@@ -256,18 +342,65 @@ function ClientDetail({ assessment }: { assessment: ClientAssessment }) {
             </tbody>
           </table>
 
-          {alternatives.length > 0 && (
-            <div className="mt-4 text-sm">
-              <div className="font-medium text-slate-700">Other options</div>
-              <ul className="mt-1 space-y-1 text-slate-600">
+          {alternatives.length > 0 && recommended && (
+            <div className="mt-5">
+              <div className="text-sm font-medium text-slate-700">
+                Other options — how each differs from {recommended.planId}
+              </div>
+              <ul className="mt-2 space-y-2">
                 {alternatives.map((p) => (
                   <li key={p.planId}>
-                    {p.planId} — {p.name} · ${p.monthlyPremium}/mo · specialist ${p.specialistCopay}
+                    <button
+                      onClick={() => setViewing(p)}
+                      className={`w-full rounded-lg border-2 px-3 py-2 text-left text-sm transition hover:border-sky-400 focus:outline-none focus:ring-4 focus:ring-sky-200 ${
+                        viewing?.planId === p.planId ? "border-sky-400 bg-sky-50" : "border-slate-200"
+                      }`}
+                    >
+                      <div className="font-medium">
+                        {p.planId} — {p.name}
+                      </div>
+                      <div className="text-slate-600">{compareToRecommended(recommended, p)}</div>
+                    </button>
                   </li>
                 ))}
               </ul>
+              <p className="mt-2 text-xs text-slate-500">
+                Click any option to compare it against the ending plan on the same rows.
+              </p>
             </div>
           )}
+
+          {/* The AI layer. Triage above is deterministic; this reads the plan documents
+              and explains what the change means for this specific person. */}
+          <div className="mt-5 rounded-xl border-2 border-slate-200 p-4">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div>
+                <div className="font-medium">Briefing for the call</div>
+                <div className="text-sm text-slate-600">
+                  Reads this plan&apos;s documents and explains what changes for {client.name.split(" ")[0]}
+                </div>
+              </div>
+              <button
+                onClick={() => void generateBrief()}
+                disabled={briefing}
+                className="rounded-lg bg-emerald-800 px-4 py-2 text-sm font-medium text-white disabled:opacity-50 focus:outline-none focus:ring-4 focus:ring-emerald-300"
+              >
+                {briefing ? "Reading documents…" : brief ? "Regenerate" : "Generate briefing"}
+              </button>
+            </div>
+
+            {briefError && (
+              <div role="alert" className="mt-3 rounded-lg bg-red-50 p-3 text-sm text-red-900">
+                {briefError}
+              </div>
+            )}
+
+            {brief && (
+              <div className="mt-3 border-t border-slate-200 pt-3 text-sm leading-relaxed">
+                <RichText text={brief} />
+              </div>
+            )}
+          </div>
         </div>
       )}
 

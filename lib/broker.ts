@@ -157,6 +157,58 @@ function disruptionScore(client: Client, current: Plan, candidate: Plan): number
   return score;
 }
 
+/**
+ * Row-by-row comparison between the ending plan and any candidate.
+ *
+ * Exported so the UI can recompute against an alternative when the broker clicks one —
+ * comparing every option against the same baseline is the whole point of showing
+ * alternatives at all.
+ */
+export function buildChanges(current: Plan, candidate: Plan): ChangeRow[] {
+  return [
+    costRow("Monthly premium", current.monthlyPremium, candidate.monthlyPremium),
+    costRow("Max out-of-pocket", current.maxOutOfPocket, candidate.maxOutOfPocket),
+    costRow("Specialist copay", current.specialistCopay, candidate.specialistCopay),
+    costRow("Medical deductible", current.medicalDeductible, candidate.medicalDeductible),
+    costRow("Drug deductible", current.rxDeductible ?? 0, candidate.rxDeductible ?? 0),
+    {
+      label: "Network type",
+      from: current.networkType,
+      to: candidate.networkType,
+      impact: candidate.networkType === current.networkType ? "same" : "worse",
+      // Not a quantity — an arrow here would imply a magnitude that doesn't exist.
+      movement: "none",
+      note:
+        candidate.networkType === current.networkType
+          ? undefined
+          : "Different network — confirm their providers are covered",
+    },
+    givebackRow(current.partBGiveback ?? 0, candidate.partBGiveback ?? 0),
+  ];
+}
+
+/** Plain-language one-liner on how a candidate compares to the recommended plan. */
+export function compareToRecommended(recommended: Plan, other: Plan): string {
+  const bits: string[] = [];
+  const d = (a: number, b: number) => b - a;
+
+  const prem = d(recommended.monthlyPremium, other.monthlyPremium);
+  if (prem !== 0) bits.push(`${money(Math.abs(prem))}/mo ${prem > 0 ? "more" : "less"} premium`);
+
+  const spec = d(recommended.specialistCopay, other.specialistCopay);
+  if (spec !== 0) bits.push(`${money(Math.abs(spec))} ${spec > 0 ? "higher" : "lower"} specialist copay`);
+
+  const med = d(recommended.medicalDeductible, other.medicalDeductible);
+  if (med !== 0) bits.push(`${money(Math.abs(med))} ${med > 0 ? "higher" : "lower"} medical deductible`);
+
+  const give = d(recommended.partBGiveback ?? 0, other.partBGiveback ?? 0);
+  if (give !== 0) bits.push(`${money(Math.abs(give))}/mo ${give > 0 ? "more" : "less"} giveback`);
+
+  if (other.networkType !== recommended.networkType) bits.push(`${other.networkType} network`);
+
+  return bits.length ? bits.join(" · ") : "Materially equivalent";
+}
+
 export function assessClient(client: Client): ClientAssessment {
   const currentPlan = getPlan(client.currentPlanId);
   const reasoning: string[] = [];
@@ -237,28 +289,7 @@ export function assessClient(client: Client): ClientAssessment {
   const best = ranked[0];
   const score = currentPlan ? disruptionScore(client, currentPlan, best) : 0;
 
-  const changes: ChangeRow[] = currentPlan
-    ? [
-        costRow("Monthly premium", currentPlan.monthlyPremium, best.monthlyPremium),
-        costRow("Max out-of-pocket", currentPlan.maxOutOfPocket, best.maxOutOfPocket),
-        costRow("Specialist copay", currentPlan.specialistCopay, best.specialistCopay),
-        costRow("Medical deductible", currentPlan.medicalDeductible, best.medicalDeductible),
-        costRow("Drug deductible", currentPlan.rxDeductible ?? 0, best.rxDeductible ?? 0),
-        {
-          label: "Network type",
-          from: currentPlan.networkType,
-          to: best.networkType,
-          impact: best.networkType === currentPlan.networkType ? "same" : "worse",
-          // Not a quantity — an arrow here would imply a magnitude that doesn't exist.
-          movement: "none",
-          note:
-            best.networkType === currentPlan.networkType
-              ? undefined
-              : "Different network — confirm their providers are covered",
-        },
-        givebackRow(currentPlan.partBGiveback ?? 0, best.partBGiveback ?? 0),
-      ]
-    : [];
+  const changes: ChangeRow[] = currentPlan ? buildChanges(currentPlan, best) : [];
 
   const networkChanges = currentPlan && best.networkType !== currentPlan.networkType;
   const premiumJump = currentPlan && best.monthlyPremium - currentPlan.monthlyPremium > 20;
