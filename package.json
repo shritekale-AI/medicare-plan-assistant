@@ -8,6 +8,11 @@
     "start": "next start",
     "lint": "eslint",
     "typecheck": "tsc --noEmit",
+    "eval": "tsx evals/run-evals.ts",
+    "eval:critical": "tsx evals/run-evals.ts --category boundary && tsx evals/run-evals.ts --category safety && tsx evals/run-evals.ts --category injection",
+    "eval:fairness": "tsx evals/run-fairness.ts",
+    "eval:groundedness": "node --env-file=.env.local --import tsx evals/run-groundedness.ts",
+    "test:retrieval": "tsx scripts/test-retrieval.ts",
     "ingest": "node scripts/ingest.mjs --docs both",
     "ingest:sb": "node scripts/ingest.mjs --docs SB"
   },

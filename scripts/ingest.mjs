@@ -13,6 +13,7 @@
  * Usage:  node scripts/ingest.mjs [--docs SB|EOC|both] [--limit N]
  */
 
+import crypto from "crypto";
 import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
@@ -117,6 +118,7 @@ async function main() {
   console.log(`Ingesting ${files.length} PDF(s) [docs=${DOC_FILTER}]\n`);
 
   const corpus = [];
+  const sources = [];
   let fileNo = 0;
 
   for (const file of files) {
@@ -126,6 +128,13 @@ async function main() {
     process.stdout.write(`[${fileNo}/${files.length}] ${meta.planId} ${meta.docType} ... `);
 
     try {
+      const bytes = fs.readFileSync(filePath);
+      // Content hash identifies the exact document revision. Plan documents are
+      // revised mid-year; without this, a citation silently points at whatever text
+      // happens to be indexed now rather than the version that supported the answer.
+      const sha256 = crypto.createHash("sha256").update(bytes).digest("hex");
+      const stat = fs.statSync(filePath);
+
       const pages = await extractPdf(filePath);
       let added = 0;
       for (const { page, text } of pages) {
@@ -135,6 +144,7 @@ async function main() {
             id: `${meta.docId}::${page}::${idx}`,
             planId: meta.planId,
             docType: meta.docType,
+            docVersion: sha256.slice(0, 12),
             section,
             page,
             text: chunkText,
@@ -142,18 +152,62 @@ async function main() {
           added++;
         }
       }
-      console.log(`${pages.length} pages, ${added} chunks`);
+
+      sources.push({
+        planId: meta.planId,
+        docType: meta.docType,
+        docId: meta.docId,
+        sourceFile: file,
+        sha256,
+        bytes: stat.size,
+        pages: pages.length,
+        chunks: added,
+        sourceModified: stat.mtime.toISOString(),
+      });
+
+      console.log(`${pages.length} pages, ${added} chunks  [${sha256.slice(0, 12)}]`);
     } catch (err) {
       console.log(`FAILED — ${err.message}`);
     }
   }
 
-  const outPath = path.join(APP_ROOT, "data", "document-corpus.json");
-  fs.writeFileSync(outPath, JSON.stringify(corpus));
-  const sizeMb = (fs.statSync(outPath).size / 1024 / 1024).toFixed(1);
   const plans = new Set(corpus.map((c) => c.planId)).size;
+  const corpusVersion = crypto
+    .createHash("sha256")
+    .update(sources.map((s) => s.sha256).sort().join(""))
+    .digest("hex")
+    .slice(0, 16);
 
-  console.log(`\nWrote ${corpus.length} chunks across ${plans} plans → data/document-corpus.json (${sizeMb} MB)`);
+  const payload = {
+    meta: {
+      corpusVersion,
+      ingestedAt: new Date().toISOString(),
+      planYear: 2026,
+      documentTypes: DOC_FILTER,
+      chunkCount: corpus.length,
+      planCount: plans,
+      sourceCount: sources.length,
+      chunking: { targetChars: TARGET_CHARS, minChars: MIN_CHARS, strategy: "sentence-aware within page" },
+      note: "corpusVersion is derived from the content hashes of every source document. If any source PDF is revised, this value changes — which is the signal to re-run evaluations and review any cached answers.",
+    },
+    chunks: corpus,
+  };
+
+  const outPath = path.join(APP_ROOT, "data", "document-corpus.json");
+  fs.writeFileSync(outPath, JSON.stringify(payload));
+
+  // Human-readable manifest, committed alongside the corpus so document revisions
+  // are visible in a diff rather than buried in an 11 MB blob.
+  const manifestPath = path.join(APP_ROOT, "data", "corpus-manifest.json");
+  fs.writeFileSync(
+    manifestPath,
+    JSON.stringify({ ...payload.meta, sources: sources.sort((a, b) => a.planId.localeCompare(b.planId)) }, null, 2)
+  );
+
+  const sizeMb = (fs.statSync(outPath).size / 1024 / 1024).toFixed(1);
+  console.log(`\nCorpus version: ${corpusVersion}`);
+  console.log(`Wrote ${corpus.length} chunks across ${plans} plans → data/document-corpus.json (${sizeMb} MB)`);
+  console.log(`Wrote manifest of ${sources.length} source documents → data/corpus-manifest.json`);
 }
 
 main().catch((e) => {

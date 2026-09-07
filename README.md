@@ -74,7 +74,17 @@ Get an API key at [platform.claude.com](https://platform.claude.com). Create a w
 | `npm run dev` | Local dev server |
 | `npm run ingest` | Extract text from plan PDFs → `data/document-corpus.json` |
 | `npm run typecheck` | TypeScript, no emit |
-| `npx tsx scripts/test-retrieval.ts` | Retrieval smoke test, including plan-isolation assertion |
+| `npm run test:retrieval` | Retrieval smoke test, including plan-isolation assertion |
+| `npm run eval` | Full 30-case behavioural golden set (needs dev server running) |
+| `npm run eval:critical` | Boundary, safety, and injection cases only |
+
+### Evaluation
+
+`evals/golden-set.json` holds 30 behavioural cases across seven categories. Each asserts **which tools were called**, **what must appear**, and **what must never appear** — rather than comparing prose to a reference answer, which is the wrong test for a conversational system.
+
+Cases in **boundary**, **safety**, and **injection** are compliance-critical: `npm run eval` exits non-zero if any fail. A retrieval regression is a quality issue; a boundary breach is a release blocker.
+
+See [docs/ai-engineering.md](docs/ai-engineering.md) for the full evaluation strategy, guardrail inventory, and prompt-injection threat model.
 
 **Note:** `npm run ingest` expects the source PDFs locally (see `scripts/ingest.mjs` for the path). The generated corpus is committed, so the app runs without re-ingesting.
 

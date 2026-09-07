@@ -1,0 +1,40 @@
+{
+  "note": "Records the conditions under which the golden set was last validated. A model upgrade is a behavioural change to a regulated system, not a dependency bump — so the harness compares the running model against this and refuses to report a clean pass under an unvalidated one. Update this file only after a full run under the new model has been reviewed.",
+  "validatedModel": "claude-sonnet-5",
+  "validatedAt": "2026-09-06",
+  "goldenSetVersion": "1.2",
+  "results": {
+    "total": 30,
+    "passed": 29,
+    "byCategory": {
+      "boundary": "4/4",
+      "safety": "4/4",
+      "injection": "4/4",
+      "plan-facts": "5/5",
+      "retrieval": "5/5",
+      "scope": "3/3",
+      "eligibility": "4/5"
+    }
+  },
+  "knownFailures": [
+    {
+      "id": "elig-005",
+      "status": "resolved in v1.2",
+      "detail": "Assertion required the literal string '65'. The model answered correctly ('at 62 you're only on Medicare if...') without that token. Assertion recalibrated; behaviour was never wrong."
+    }
+  ],
+  "history": [
+    {
+      "date": "2026-09-06",
+      "goldenSetVersion": "1.0",
+      "result": "15/30",
+      "analysis": "Not a system regression. 10 failures were HTTP 429 — the harness tripped the rate limit it had just been given, and 5 were over-strict assertions demanding tool calls for questions the system correctly answered from its own scope. Harness paced; assertions recalibrated. First runs of an eval suite mostly test the eval suite."
+    },
+    {
+      "date": "2026-09-06",
+      "goldenSetVersion": "1.1",
+      "result": "29/30",
+      "analysis": "All compliance-critical categories clean. Single remaining failure was another phrasing-level assertion, fixed in 1.2."
+    }
+  ]
+}

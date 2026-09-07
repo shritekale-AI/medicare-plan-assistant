@@ -26,6 +26,8 @@ export type Chunk = {
   id: string;
   planId: string;
   docType: "SB" | "EOC";
+  /** Short content hash of the source PDF — identifies the document revision. */
+  docVersion?: string;
   /** Section heading, where one was detectable during ingestion. */
   section: string;
   /** Page number in the source PDF, for citation. */
@@ -42,10 +44,22 @@ export type RetrievalHit = {
     section: string;
     page: number;
     url: string;
+    docVersion: string;
+    corpusVersion: string;
   };
 };
 
+export type CorpusMeta = {
+  corpusVersion: string;
+  ingestedAt: string;
+  planYear: number;
+  chunkCount: number;
+  planCount: number;
+  sourceCount: number;
+};
+
 let CORPUS: Chunk[] | null = null;
+let META: CorpusMeta | null = null;
 let IDF: Map<string, number> | null = null;
 let AVG_LEN = 0;
 
@@ -70,7 +84,19 @@ function loadCorpus(): Chunk[] {
     CORPUS = [];
     return CORPUS;
   }
-  CORPUS = JSON.parse(fs.readFileSync(corpusPath, "utf-8")) as Chunk[];
+  const parsed = JSON.parse(fs.readFileSync(corpusPath, "utf-8")) as
+    | Chunk[]
+    | { meta: CorpusMeta; chunks: Chunk[] };
+
+  // Accept both the legacy flat array and the versioned {meta, chunks} shape, so an
+  // older corpus doesn't break the app before it's been re-ingested.
+  if (Array.isArray(parsed)) {
+    CORPUS = parsed;
+    META = null;
+  } else {
+    CORPUS = parsed.chunks;
+    META = parsed.meta;
+  }
 
   // Precompute IDF across the whole corpus.
   const df = new Map<string, number>();
@@ -136,6 +162,20 @@ function scoreChunk(queryTokens: string[], queryBigrams: string[], chunk: Chunk)
 const DOC_BASE = "https://www.humana-medicare.com/BenefitSummary/2026PDFs";
 
 /**
+ * Neutralise delimiter-spoofing in retrieved text.
+ *
+ * A document containing a literal `</retrieved_document>` could close the wrapper
+ * early and make whatever follows look like trusted instruction rather than quoted
+ * source material. Humana's own PDFs won't contain this — but the defence belongs
+ * at the boundary, not in an assumption about who authored the corpus. The moment
+ * this pipeline ingests provider-submitted or third-party content, the assumption
+ * fails and the boundary is all that's left.
+ */
+function sanitiseForContext(text: string): string {
+  return text.replace(/<\/?retrieved_document>/gi, "[tag removed]");
+}
+
+/**
  * Search one plan's documents. planId is required and applied as a hard filter.
  */
 export async function searchPlanDocuments(
@@ -176,7 +216,12 @@ export async function searchPlanDocuments(
 
   return {
     hits: scored.map(({ chunk, score }) => ({
-      text: chunk.text,
+      // Delimited so the model can tell retrieved reference material apart from
+      // its instructions. Indirect prompt injection — malicious text living inside
+      // an indexed document — is the realistic attack on a RAG system, and it works
+      // precisely because retrieved text and instructions otherwise look identical
+      // once they are both just tokens in the context window.
+      text: `<retrieved_document>\n${sanitiseForContext(chunk.text)}\n</retrieved_document>`,
       score: Number(score.toFixed(3)),
       citation: {
         planId: chunk.planId,
@@ -184,14 +229,25 @@ export async function searchPlanDocuments(
         section: chunk.section,
         page: chunk.page,
         url: `${DOC_BASE}/${chunk.id.split("::")[0]}${chunk.docType}26.pdf#page=${chunk.page}`,
+        // Identifies the exact document revision this text came from. Plan documents
+        // are revised mid-year; without it, a citation points at "the current file"
+        // rather than the version that actually supported the answer.
+        docVersion: chunk.docVersion ?? "unversioned",
+        corpusVersion: META?.corpusVersion ?? "unversioned",
       },
     })),
   };
 }
 
-/** Corpus stats, surfaced in the UI so viewers can see what is actually indexed. */
+/** Corpus stats, surfaced so viewers can see what is actually indexed and at which version. */
 export function corpusStats() {
   const corpus = loadCorpus();
   const plans = new Set(corpus.map((c) => c.planId));
-  return { chunks: corpus.length, plans: plans.size, indexed: corpus.length > 0 };
+  return {
+    chunks: corpus.length,
+    plans: plans.size,
+    indexed: corpus.length > 0,
+    corpusVersion: META?.corpusVersion ?? "unversioned",
+    ingestedAt: META?.ingestedAt ?? null,
+  };
 }
