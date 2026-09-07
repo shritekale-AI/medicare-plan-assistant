@@ -180,6 +180,30 @@ export function runEligibilityGates(input: EligibilityInput): GateResult[] {
       message: `You can make a change right now — you're covered by ${windows[0]}.`,
       basis: windows.join("; "),
     });
+  } else if (
+    input.age !== undefined &&
+    input.age >= 64 &&
+    input.age <= 66 &&
+    input.birthMonth === undefined
+  ) {
+    /**
+     * Someone around 65 is very likely inside their Initial Enrollment Period — but
+     * IEP is a seven-month window keyed to their birthday, so it cannot be evaluated
+     * without a birth month.
+     *
+     * Reporting "fail" here would tell a first-time shopper they had missed a window
+     * they are almost certainly inside. Missing information must read as UNKNOWN,
+     * never as a negative finding. Surfaced by testing the newly-eligible persona.
+     */
+    results.push({
+      gate: "enrollment_period",
+      label: "Enrollment window",
+      status: "unknown",
+      message:
+        "Around 65 there's usually a seven-month window to join — from three months before your birthday month through three months after. I need to know which month you turned 65 to check that.",
+      nextStep: "Ask which month they turned (or turn) 65.",
+      basis: "Initial Enrollment Period: 3 months before through 3 months after the 65th birthday month.",
+    });
   } else {
     const daysToAEP = daysUntilAEP(today);
     results.push({

@@ -39,6 +39,14 @@ const STARTERS = [
     prompt:
       "I'm helping my mother. She's 68 in ZIP 28270, her plan is being discontinued, she takes four medications and sees a cardiologist. Can you show me how her options compare?",
   },
+  {
+    id: "steve",
+    name: "Steve, 65",
+    role: "New to Medicare, first time shopping",
+    mode: "Needs the basics first",
+    prompt:
+      "I turned 65 in August and I live in 28270. I'm still working part time with coverage through my job, and I only take one blood pressure pill. Honestly I don't know if I need to do anything at all right now — where do I start?",
+  },
 ];
 
 export default function Home() {
@@ -190,15 +198,20 @@ export default function Home() {
               )}
             </p>
           </div>
-          <label className="flex cursor-pointer items-center gap-2 text-sm">
-            <input
-              type="checkbox"
-              checked={showTrace}
-              onChange={(e) => setShowTrace(e.target.checked)}
-              className="h-4 w-4"
-            />
-            Show reasoning
-          </label>
+          <div className="flex items-center gap-4 text-sm">
+            <label className="flex cursor-pointer items-center gap-2">
+              <input
+                type="checkbox"
+                checked={showTrace}
+                onChange={(e) => setShowTrace(e.target.checked)}
+                className="h-4 w-4"
+              />
+              Show reasoning
+            </label>
+            <a href="/broker" className="text-emerald-800 underline">
+              Broker view →
+            </a>
+          </div>
         </div>
       </header>
 

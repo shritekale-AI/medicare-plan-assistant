@@ -1,0 +1,287 @@
+"use client";
+
+import { useMemo, useState } from "react";
+import Link from "next/link";
+import { assessBook, BOOK_META, type ClientAssessment, type Triage } from "@/lib/broker";
+
+/**
+ * The broker surface — Tony's book of business.
+ *
+ * His question in October is not "what plans exist." It is "which of my sixty
+ * displaced clients can I move quickly, which need a conversation, and which are
+ * actually stuck?" Everything here is arranged around that triage, because sorting
+ * eight weeks of undifferentiated work into a prioritised list is the whole value.
+ *
+ * Note this consumes the SAME rules and plan data as the member-facing assistant.
+ * One capability layer, a different experience on top.
+ */
+
+const GROUPS: { key: Triage; title: string; blurb: string; tone: string }[] = [
+  {
+    key: "clear_port",
+    title: "Port these",
+    blurb: "A clean match exists — same network, drug coverage preserved, no material cost jump",
+    tone: "border-emerald-400 bg-emerald-50",
+  },
+  {
+    key: "needs_review",
+    title: "Review before porting",
+    blurb: "A replacement exists but something material changes — worth a call first",
+    tone: "border-amber-400 bg-amber-50",
+  },
+  {
+    key: "no_options",
+    title: "No eligible plan",
+    blurb: "Nothing in-market fits. These need a conversation, and may leave",
+    tone: "border-red-400 bg-red-50",
+  },
+  {
+    key: "unaffected",
+    title: "Unaffected",
+    blurb: "Plan continues into 2027 — no action",
+    tone: "border-slate-300 bg-slate-50",
+  },
+];
+
+export default function BrokerPage() {
+  const [signedIn, setSignedIn] = useState(false);
+  const [open, setOpen] = useState<Triage | null>("clear_port");
+  const [selected, setSelected] = useState<ClientAssessment | null>(null);
+
+  const book = useMemo(() => assessBook(), []);
+
+  if (!signedIn) {
+    return (
+      <div className="min-h-screen bg-slate-100">
+        <Banner />
+        <div className="mx-auto max-w-md px-4 py-20">
+          <div className="rounded-2xl border-2 border-slate-200 bg-white p-8">
+            <h1 className="text-2xl font-semibold">Agent sign-in</h1>
+            <p className="mt-2 text-slate-600">
+              Broker view — your book of business, triaged against the 2027 plan exits.
+            </p>
+            <div className="mt-6 rounded-lg bg-slate-100 p-3 text-sm text-slate-700">
+              <strong>Simulated sign-in.</strong> No authentication is implemented. Real deployment
+              would use Humana&apos;s existing agent identity, since this exposes client data.
+            </div>
+            <button
+              onClick={() => setSignedIn(true)}
+              className="mt-6 w-full rounded-xl bg-emerald-800 px-6 py-3 text-lg font-medium text-white focus:outline-none focus:ring-4 focus:ring-emerald-300"
+            >
+              Continue as {BOOK_META.broker.name} ({BOOK_META.broker.agentId})
+            </button>
+            <Link href="/" className="mt-4 block text-center text-emerald-800 underline">
+              ← Back to the member assistant
+            </Link>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="min-h-screen bg-slate-100 text-slate-900">
+      <Banner />
+
+      <header className="border-b border-slate-200 bg-white px-4 py-4">
+        <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-3">
+          <div>
+            <h1 className="text-xl font-semibold">Book of business — {BOOK_META.broker.name}</h1>
+            <p className="text-sm text-slate-600">
+              {BOOK_META.broker.market} · {book.totals.clients} clients ·{" "}
+              <strong>{book.totals.affected} affected by 2027 exits</strong>
+            </p>
+          </div>
+          <Link href="/" className="text-emerald-800 underline">
+            Member assistant →
+          </Link>
+        </div>
+      </header>
+
+      <main className="mx-auto max-w-6xl px-4 py-6">
+        {/* Triage summary — the answer to "where do I start?" */}
+        <div className="mb-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          {GROUPS.map((g) => {
+            const count = book.groups[g.key].length;
+            return (
+              <button
+                key={g.key}
+                onClick={() => {
+                  setOpen(open === g.key ? null : g.key);
+                  setSelected(null);
+                }}
+                className={`rounded-xl border-2 p-4 text-left transition hover:shadow-md focus:outline-none focus:ring-4 focus:ring-emerald-300 ${g.tone} ${
+                  open === g.key ? "ring-4 ring-emerald-300" : ""
+                }`}
+              >
+                <div className="text-3xl font-semibold">{count}</div>
+                <div className="font-medium">{g.title}</div>
+                <div className="mt-1 text-sm text-slate-600">{g.blurb}</div>
+              </button>
+            );
+          })}
+        </div>
+
+        <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.2fr)]">
+          {/* Client list for the open group */}
+          <div>
+            {open && (
+              <div className="rounded-xl border border-slate-200 bg-white">
+                <div className="border-b border-slate-200 px-4 py-3 font-medium">
+                  {GROUPS.find((g) => g.key === open)?.title} ({book.groups[open].length})
+                </div>
+                <ul className="divide-y divide-slate-100">
+                  {book.groups[open].map((a) => (
+                    <li key={a.client.id}>
+                      <button
+                        onClick={() => setSelected(a)}
+                        className={`w-full px-4 py-3 text-left hover:bg-slate-50 focus:outline-none focus:ring-4 focus:ring-inset focus:ring-emerald-300 ${
+                          selected?.client.id === a.client.id ? "bg-emerald-50" : ""
+                        }`}
+                      >
+                        <div className="flex items-baseline justify-between gap-2">
+                          <span className="font-medium">{a.client.name}</span>
+                          <span className="text-sm text-slate-500">{a.client.age}</span>
+                        </div>
+                        <div className="text-sm text-slate-600">{a.headline}</div>
+                        <div className="mt-1 text-xs text-slate-500">
+                          {a.client.currentPlanId} · {a.client.medicationCount} medication
+                          {a.client.medicationCount === 1 ? "" : "s"}
+                          {a.client.doctors.length > 0 && ` · ${a.client.doctors.length} named provider(s)`}
+                        </div>
+                      </button>
+                    </li>
+                  ))}
+                  {book.groups[open].length === 0 && (
+                    <li className="px-4 py-6 text-slate-500">No clients in this group.</li>
+                  )}
+                </ul>
+              </div>
+            )}
+          </div>
+
+          {/* Client detail — what changes, and why */}
+          <div>
+            {selected ? (
+              <ClientDetail assessment={selected} />
+            ) : (
+              <div className="rounded-xl border border-dashed border-slate-300 bg-white p-8 text-center text-slate-500">
+                Select a client to see what changes for them.
+              </div>
+            )}
+          </div>
+        </div>
+      </main>
+    </div>
+  );
+}
+
+function ClientDetail({ assessment }: { assessment: ClientAssessment }) {
+  const { client, currentPlan, recommended, changes, reasoning, blockers, alternatives } = assessment;
+
+  return (
+    <div className="rounded-xl border border-slate-200 bg-white">
+      <div className="border-b border-slate-200 px-5 py-4">
+        <h2 className="text-lg font-semibold">{client.name}</h2>
+        <p className="text-sm text-slate-600">
+          {client.age} · {client.zip} · last contacted {client.lastContact}
+        </p>
+        <p className="mt-1 text-sm">{assessment.headline}</p>
+      </div>
+
+      {blockers.length > 0 && (
+        <div className="border-b border-red-200 bg-red-50 px-5 py-4">
+          <div className="font-medium text-red-900">Blocked</div>
+          <ul className="mt-1 list-disc pl-5 text-sm text-red-900">
+            {blockers.map((b, i) => (
+              <li key={i}>{b}</li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      {currentPlan && recommended && (
+        <div className="px-5 py-4">
+          <div className="mb-3 grid grid-cols-2 gap-3 text-sm">
+            <div className="rounded-lg bg-slate-100 p-3">
+              <div className="text-slate-500">Ending</div>
+              <div className="font-medium">{currentPlan.name}</div>
+              <div className="text-slate-600">{currentPlan.planId}</div>
+            </div>
+            <div className="rounded-lg bg-emerald-50 p-3">
+              <div className="text-slate-500">Recommended</div>
+              <div className="font-medium">{recommended.name}</div>
+              <div className="text-slate-600">{recommended.planId}</div>
+            </div>
+          </div>
+
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b border-slate-200 text-left text-slate-500">
+                <th className="py-2 font-medium">What changes</th>
+                <th className="py-2 font-medium">Now</th>
+                <th className="py-2 font-medium">Proposed</th>
+              </tr>
+            </thead>
+            <tbody>
+              {changes.map((c) => (
+                <tr key={c.label} className="border-b border-slate-100">
+                  <td className="py-2">{c.label}</td>
+                  <td className="py-2 text-slate-600">{c.from}</td>
+                  <td
+                    className={`py-2 font-medium ${
+                      c.direction === "better"
+                        ? "text-emerald-800"
+                        : c.direction === "worse"
+                          ? "text-red-800"
+                          : "text-slate-600"
+                    }`}
+                  >
+                    {c.to}
+                    {c.direction === "better" && " ↓"}
+                    {c.direction === "worse" && " ↑"}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+
+          {alternatives.length > 0 && (
+            <div className="mt-4 text-sm">
+              <div className="font-medium text-slate-700">Other options</div>
+              <ul className="mt-1 space-y-1 text-slate-600">
+                {alternatives.map((p) => (
+                  <li key={p.planId}>
+                    {p.planId} — {p.name} · ${p.monthlyPremium}/mo · specialist ${p.specialistCopay}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+        </div>
+      )}
+
+      <div className="border-t border-slate-200 bg-slate-50 px-5 py-4 text-sm">
+        <div className="font-medium text-slate-700">Why this grouping</div>
+        <ul className="mt-1 list-disc pl-5 text-slate-600">
+          {reasoning.map((r, i) => (
+            <li key={i}>{r}</li>
+          ))}
+        </ul>
+        <p className="mt-3 text-xs text-slate-500">
+          Triage is deterministic code, not a model judgment — the agent is licensed and accountable,
+          so the same client must always land in the same bucket and the reason must be auditable.
+        </p>
+      </div>
+    </div>
+  );
+}
+
+function Banner() {
+  return (
+    <div className="bg-slate-900 px-4 py-2 text-center text-sm text-slate-100">
+      <strong>Prototype — broker view.</strong> All clients shown are fictional. No real people, no
+      PHI. Not affiliated with Humana.
+    </div>
+  );
+}
