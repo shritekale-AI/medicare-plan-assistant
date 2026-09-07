@@ -49,6 +49,10 @@ Judge ONLY against the passages. Do not use your own knowledge of Medicare — i
 
 Identify each distinct factual claim in the answer about coverage, costs, rules, or benefits. Ignore conversational filler, offers to help, and questions back to the user.
 
+Also ignore which plan is being discussed. The assistant is told the plan ID by the person asking and scopes its search to that plan's documents; the passages themselves rarely restate it. Treating "this is plan H1036-308" as an unsupported claim measures the harness, not the assistant. Judge what it says ABOUT the plan, not that it named it.
+
+DO judge citation precision as a claim. If the answer attributes text to a specific chapter, section number, or heading, that locator must appear in the passages. A fabricated locator is a serious failure: it looks verifiable, so nobody checks it.
+
 Classify each claim:
 - SUPPORTED: directly stated or unambiguously implied by the passages
 - UNSUPPORTED: not derivable from the passages
@@ -58,6 +62,20 @@ Reply as JSON only:
 {"claims":[{"claim":"...","verdict":"SUPPORTED|UNSUPPORTED|CONTRADICTED","note":"..."}],"groundedness":0.0}
 
 where groundedness = supported claims / total claims, rounded to 2 decimals.`;
+
+/**
+ * Pull the JSON object out of a judge reply that may be fenced or prefaced.
+ * Tolerant of ```json fences and of a sentence before the object; NOT tolerant of
+ * truncation, which is detected separately from stop_reason so a dropped sample is
+ * reported as dropped rather than silently narrowing the denominator.
+ */
+function extractJson(text: string): string {
+  const stripped = text.replace(/```(?:json)?/gi, "").trim();
+  const start = stripped.indexOf("{");
+  const end = stripped.lastIndexOf("}");
+  if (start === -1 || end === -1 || end < start) return stripped;
+  return stripped.slice(start, end + 1);
+}
 
 type TraceEntry = { tool: string; evidence?: { text: string; page: number; document: string }[] };
 
@@ -74,6 +92,7 @@ async function main() {
 
   const scores: number[] = [];
   const problems: string[] = [];
+  const unscored: string[] = [];
   let first = true;
 
   for (const { planId, q } of CASES) {
@@ -110,7 +129,7 @@ async function main() {
 
     const verdict = await judge.messages.create({
       model: MODEL,
-      max_tokens: 1500,
+      max_tokens: 8000,
       system: JUDGE_PROMPT,
       messages: [
         {
@@ -125,8 +144,19 @@ async function main() {
       .map((b) => b.text)
       .join("");
 
+    // A truncated judge reply is unparseable for a reason worth naming. The first run
+    // of this harness silently lost the case with the most claims — reported as
+    // "could not parse", which reads like a formatting quirk and is actually a
+    // dropped sample. An eval that quietly shrinks its own denominator is worse than
+    // no eval, so truncation is now distinguished from malformed output.
+    if (verdict.stop_reason === "max_tokens") {
+      console.log(`    judge reply truncated at max_tokens — case NOT scored\n`);
+      unscored.push(`${planId}: judge truncated`);
+      continue;
+    }
+
     try {
-      const parsed = JSON.parse(text.replace(/^```json\s*|\s*```$/g, "")) as {
+      const parsed = JSON.parse(extractJson(text)) as {
         claims: { claim: string; verdict: string; note: string }[];
         groundedness: number;
       };
@@ -142,7 +172,8 @@ async function main() {
         problems.push(`${planId}: ${c.claim.slice(0, 60)}`);
       }
     } catch {
-      console.log(`    could not parse judge output`);
+      console.log(`    could not parse judge output — case NOT scored`);
+      unscored.push(`${planId}: unparseable judge output`);
     }
     console.log();
   }
@@ -150,8 +181,14 @@ async function main() {
   console.log("─".repeat(60));
   if (scores.length > 0) {
     const mean = scores.reduce((a, b) => a + b, 0) / scores.length;
-    console.log(`Mean groundedness: ${mean.toFixed(2)} across ${scores.length} answers`);
+    console.log(`Mean groundedness: ${mean.toFixed(2)} across ${scores.length} of ${CASES.length} answers`);
     console.log(`Fully grounded answers: ${scores.filter((s) => s >= 0.999).length}/${scores.length}`);
+  }
+  if (unscored.length > 0) {
+    // Stated on its own line because a mean over a subset is not a mean over the set.
+    console.log(`
+NOT SCORED (${unscored.length}/${CASES.length}) — the mean above excludes these:`);
+    for (const u of unscored) console.log(`  · ${u}`);
   }
   if (problems.length > 0) {
     console.log(`\n${problems.length} claim(s) not fully supported by retrieved text.`);
