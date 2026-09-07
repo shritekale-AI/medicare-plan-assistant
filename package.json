@@ -13,11 +13,14 @@
     "eval:fairness": "tsx evals/run-fairness.ts",
     "eval:groundedness": "node --env-file=.env.local --import tsx evals/run-groundedness.ts",
     "test:retrieval": "tsx scripts/test-retrieval.ts",
+    "mcp": "tsx mcp-server/server.ts",
+    "mcp:verify": "tsx mcp-server/test-client.ts",
     "ingest": "node scripts/ingest.mjs --docs both",
     "ingest:sb": "node scripts/ingest.mjs --docs SB"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.124.0",
+    "@modelcontextprotocol/sdk": "^1.30.0",
     "next": "16.3.4",
     "react": "19.2.8",
     "react-dom": "19.2.8"

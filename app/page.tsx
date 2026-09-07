@@ -5,11 +5,17 @@ import { useSpeech } from "@/lib/useSpeech";
 import { TracePanel, type TraceEntry } from "@/components/TracePanel";
 import { RichText } from "@/components/RichText";
 
+type Attachment = { mediaType: string; data: string; name: string; previewUrl: string };
+
 type Message = {
   role: "user" | "assistant";
   content: string;
   trace?: TraceEntry[];
+  attachmentName?: string;
 };
+
+const MAX_IMAGE_BYTES = 4 * 1024 * 1024;
+const ALLOWED_IMAGE_TYPES = ["image/jpeg", "image/png", "image/webp", "image/gif"];
 
 /**
  * Two entry points, because the two primary personas want opposite interfaces over
@@ -44,9 +50,11 @@ export default function Home() {
   const [showTrace, setShowTrace] = useState(true);
 
   const [build, setBuild] = useState<{ commit: string; corpusVersion: string } | null>(null);
+  const [attachment, setAttachment] = useState<Attachment | null>(null);
 
   const { listening, speaking, supported, listen, stopListening, speak, stopSpeaking } = useSpeech();
   const endRef = useRef<HTMLDivElement>(null);
+  const fileRef = useRef<HTMLInputElement>(null);
 
   // Surfaces which commit and corpus version are actually running, so "is the live
   // link current?" can be answered by looking rather than assuming.
@@ -64,13 +72,45 @@ export default function Home() {
     endRef.current?.scrollIntoView({ behavior: reduced ? "auto" : "smooth" });
   }, [messages, loading]);
 
+  /** Read a chosen image into base64, so it can be sent inline to the API. */
+  function handleFile(file: File) {
+    setError(null);
+    if (!ALLOWED_IMAGE_TYPES.includes(file.type)) {
+      setError("Please choose a photo — JPEG, PNG, WebP, or GIF.");
+      return;
+    }
+    if (file.size > MAX_IMAGE_BYTES) {
+      setError("That photo is too large. Please use one under 4MB.");
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = () => {
+      const result = reader.result as string;
+      setAttachment({
+        mediaType: file.type,
+        data: result.split(",")[1],
+        name: file.name,
+        previewUrl: result,
+      });
+    };
+    reader.onerror = () => setError("Could not read that file. Please try another.");
+    reader.readAsDataURL(file);
+  }
+
   async function send(text: string) {
     const trimmed = text.trim();
-    if (!trimmed || loading) return;
+    const image = attachment;
+    if ((!trimmed && !image) || loading) return;
 
     setError(null);
     setInput("");
-    const next: Message[] = [...messages, { role: "user", content: trimmed }];
+    setAttachment(null);
+
+    const userContent = trimmed || "Here's the letter I received — what does it mean?";
+    const next: Message[] = [
+      ...messages,
+      { role: "user", content: userContent, attachmentName: image?.name },
+    ];
     setMessages(next);
     setLoading(true);
 
@@ -79,7 +119,14 @@ export default function Home() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          messages: next.map((m) => ({ role: m.role, content: m.content })),
+          messages: next.map((m, i) => ({
+            role: m.role,
+            content: m.content,
+            // Only the message just sent carries the image payload.
+            ...(image && i === next.length - 1
+              ? { image: { mediaType: image.mediaType, data: image.data } }
+              : {}),
+          })),
         }),
       });
       const data = await res.json();
@@ -194,6 +241,9 @@ export default function Home() {
                 }
               >
                 <span className="sr-only">{m.role === "user" ? "You said: " : "Assistant replied: "}</span>
+                {m.attachmentName && (
+                  <p className="mb-1 text-sm opacity-90">📎 {m.attachmentName}</p>
+                )}
                 <RichText text={m.content} />
               </div>
               {m.role === "assistant" && showTrace && m.trace && <TracePanel trace={m.trace} />}
@@ -218,7 +268,48 @@ export default function Home() {
 
       <div className="sticky bottom-0 border-t border-slate-200 bg-white px-4 py-4">
         <div className="mx-auto max-w-4xl">
+          {attachment && (
+            <div className="mb-2 flex items-center gap-3 rounded-xl border-2 border-emerald-300 bg-emerald-50 p-2">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={attachment.previewUrl}
+                alt={`Preview of ${attachment.name}`}
+                className="h-14 w-14 rounded object-cover"
+              />
+              <div className="flex-1 text-sm">
+                <div className="font-medium">{attachment.name}</div>
+                <div className="text-slate-600">Will be sent with your next message</div>
+              </div>
+              <button
+                onClick={() => setAttachment(null)}
+                className="rounded px-3 py-2 text-slate-700 underline focus:outline-none focus:ring-4 focus:ring-emerald-300"
+              >
+                Remove
+              </button>
+            </div>
+          )}
+
           <div className="flex items-end gap-2">
+            <input
+              ref={fileRef}
+              type="file"
+              accept="image/*"
+              className="sr-only"
+              onChange={(e) => {
+                const f = e.target.files?.[0];
+                if (f) handleFile(f);
+                e.target.value = "";
+              }}
+            />
+            <button
+              onClick={() => fileRef.current?.click()}
+              aria-label="Attach a photo of your letter"
+              title="Attach a photo of your letter"
+              className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-slate-200 text-2xl text-slate-800 transition hover:bg-slate-300 focus:outline-none focus:ring-4 focus:ring-emerald-300"
+            >
+              <span aria-hidden="true">📄</span>
+            </button>
+
             {supported.input && (
               <button
                 onClick={handleMic}
@@ -256,7 +347,7 @@ export default function Home() {
 
             <button
               onClick={() => void send(input)}
-              disabled={loading || !input.trim()}
+              disabled={loading || (!input.trim() && !attachment)}
               className="h-14 shrink-0 rounded-xl bg-emerald-800 px-6 text-lg font-medium text-white focus:outline-none focus:ring-4 focus:ring-emerald-300 disabled:opacity-50"
             >
               Send

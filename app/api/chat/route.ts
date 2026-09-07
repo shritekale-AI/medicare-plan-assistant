@@ -2,7 +2,8 @@ import Anthropic from "@anthropic-ai/sdk";
 import { NextResponse } from "next/server";
 import { TOOLS, executeTool } from "@/lib/tools";
 import { PLAN_META } from "@/lib/plans";
-import { MODEL, GENERATION, LIMITS } from "@/lib/config";
+import { MODELS, GENERATION, LIMITS } from "@/lib/config";
+import { compactConversation } from "@/lib/summarize";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -78,12 +79,43 @@ Often someone in their late 60s whose plan is being discontinued, or an adult ch
 ## When to hand off
 Call \`create_handoff_summary\` when they ask to speak to someone, express real hesitation, want a recommendation, or are ready to enroll. Tell them what you are passing along so they know they will not have to repeat themselves.
 
+## If they send a photo
+People often arrive holding the letter that started this — a CMS Annual Notice of Change or non-renewal notice. When an image is attached:
+- Read it and say what it means in one plain sentence before anything else. These letters are dense and frightening; leading with reassurance about what it *is* matters more than detail.
+- Pull out what's useful: the plan name and ID (formatted like H1036-318), the county, and any deadline.
+- Confirm what you found rather than assuming — "It looks like this is about plan H1036-318 in Mecklenburg County. Does that match your card?"
+- Then carry on normally, skipping questions the letter already answered.
+- If it isn't a Medicare document, say so kindly and ask what they'd like help with.
+- Never read out a Medicare number, member ID, or other identifier you can see. Tell them you noticed it and are deliberately not repeating it.
+
+## Worked examples
+
+**Eliciting a fact they may not know they have:**
+> Person: "I'm 68 in 28270, my plan's ending."
+> You: "I can help with that. One thing that changes the options quite a bit — does the state help pay any of your Medicare premiums or medical costs? Some people qualify without realising it."
+
+*Note the phrasing: not "are you Medicaid eligible?" People answer that one wrongly.*
+
+**Declining to recommend, without being unhelpful:**
+> Person: "Just tell me which one to pick."
+> You: "I can't pick for you — that's a licensed advocate's call, and they can weigh things I can't. What I can do is narrow it down and show you exactly how the remaining options differ, so that conversation is short. Shall I do that, or would you rather I connect you with someone now?"
+
+**Answering from a document, with the citation:**
+> Person: "Am I covered if I get sick visiting my son?"
+> You: "Yes, for urgent or emergency care — that's in the plan's Evidence of Coverage on page 73. Worth knowing it's specifically urgent care, not a routine check-up you happen to schedule while away."
+
+**Surfacing a failed gate rather than hiding it:**
+> You: "One thing to flag honestly — you're outside the window when Medicare lets you switch. It opens October 15, so about 39 days. But since your plan is ending, that usually opens a special window for you sooner. We can still get everything ready today."
+
 ## Context
 Today is ${new Date().toISOString().slice(0, 10)}. This prototype covers ${PLAN_META.plansCaptured} Medicare Advantage plans in ${PLAN_META.county} County, ${PLAN_META.state} (ZIP ${PLAN_META.zip}) for plan year ${PLAN_META.planYear}. Medicare's Annual Enrollment Period runs October 15 to December 7.
 
 If someone asks about a different area, explain plainly that this prototype only holds data for ZIP 28270.`;
 
-type IncomingMessage = { role: "user" | "assistant"; content: string };
+type IncomingImage = { mediaType: string; data: string };
+type IncomingMessage = { role: "user" | "assistant"; content: string; image?: IncomingImage };
+
+const ALLOWED_IMAGE_TYPES = ["image/jpeg", "image/png", "image/webp", "image/gif"];
 type TraceEntry = {
   tool: string;
   input: unknown;
@@ -158,19 +190,66 @@ export async function POST(req: Request) {
     );
   }
 
+  // Validate any attached images before they reach the model.
+  for (const m of incoming) {
+    if (!m.image) continue;
+    if (!ALLOWED_IMAGE_TYPES.includes(m.image.mediaType)) {
+      return NextResponse.json(
+        { error: "bad_request", message: "Images must be JPEG, PNG, WebP, or GIF." },
+        { status: 400 }
+      );
+    }
+    // base64 inflates by ~4/3; compare against the decoded size.
+    if ((m.image.data.length * 3) / 4 > LIMITS.maxImageBytes) {
+      return NextResponse.json(
+        { error: "too_large", message: "That image is too large. Please use one under 4MB." },
+        { status: 400 }
+      );
+    }
+  }
+
   const client = new Anthropic({ apiKey });
 
-  const messages: Anthropic.MessageParam[] = incoming.map((m) => ({
-    role: m.role,
-    content: m.content,
-  }));
+  // Compact older turns before building the request. Text only — an image is the
+  // one thing a summary genuinely cannot carry forward, so images always sit in the
+  // recent window or not at all.
+  const textOnly = incoming.map((m) => ({ role: m.role, content: m.content }));
+  const { messages: compacted, compacted: didCompact, summarised } =
+    await compactConversation(client, textOnly);
+
+  const messages: Anthropic.MessageParam[] = didCompact
+    ? compacted.map((m) => ({ role: m.role, content: m.content }))
+    : incoming.map((m) => {
+        if (!m.image) return { role: m.role, content: m.content };
+        return {
+          role: m.role,
+          content: [
+            {
+              type: "image" as const,
+              source: {
+                type: "base64" as const,
+                media_type: m.image.mediaType as "image/jpeg" | "image/png" | "image/webp" | "image/gif",
+                data: m.image.data,
+              },
+            },
+            { type: "text" as const, text: m.content || "Here's the letter I received." },
+          ],
+        };
+      });
 
   const trace: TraceEntry[] = [];
+  if (didCompact) {
+    trace.push({
+      tool: "compact_conversation",
+      input: { summarisedMessages: summarised, model: MODELS.fast },
+      summary: `${summarised} earlier messages summarised to stay within context`,
+    });
+  }
 
   try {
     for (let turn = 0; turn < MAX_TURNS; turn++) {
       const response = await client.messages.create({
-        model: MODEL,
+        model: MODELS.primary,
         max_tokens: GENERATION.maxTokens,
         system: SYSTEM_PROMPT,
         tools: TOOLS,
@@ -273,6 +352,8 @@ function summariseResult(tool: string, result: unknown): string {
       return typeof r.name === "string" ? r.name : "plan detail";
     case "create_handoff_summary":
       return "handoff summary prepared";
+    case "compact_conversation":
+      return "earlier turns summarised";
     default:
       return "done";
   }

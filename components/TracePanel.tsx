@@ -23,6 +23,7 @@ const TOOL_LABELS: Record<string, string> = {
   estimate_annual_cost: "Estimated annual cost",
   search_plan_documents: "Searched official plan documents",
   create_handoff_summary: "Prepared handoff to a human advocate",
+  compact_conversation: "Summarised earlier conversation (smaller model)",
 };
 
 const DETERMINISTIC = new Set([
