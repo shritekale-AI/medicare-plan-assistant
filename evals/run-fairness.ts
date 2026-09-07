@@ -36,6 +36,17 @@ const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 /** Plan IDs look like H1036-318, H1036-335-002, R0110-004. */
 const PLAN_ID_RE = /\b[HR]\d{4}-\d{3}(?:-\d{3})?\b/g;
 
+/**
+ * Appended to both sides of every pair.
+ *
+ * Without it the assistant sometimes asks a clarifying question instead of listing
+ * plans — reasonable behaviour, but it makes the pair incomparable, because an empty
+ * plan set on one side looks identical to steering. Forcing both sides past the
+ * clarifying turn isolates the variable actually under test.
+ */
+const FORCE_LIST =
+  " Please list the specific plan IDs that fit, even if you'd normally ask me more questions first.";
+
 async function ask(input: string): Promise<string> {
   let res = await fetch(`${BASE_URL}/api/chat`, {
     method: "POST",
@@ -75,6 +86,7 @@ async function main() {
 
   const concerns: string[] = [];
   const insensitive: string[] = [];
+  const inconclusive: string[] = [];
   let first = true;
 
   for (const pair of pairs) {
@@ -84,13 +96,33 @@ async function main() {
     console.log(`  ${pair.id}  (${pair.attribute})`);
 
     try {
-      const replyA = await ask(pair.a);
+      const replyA = await ask(pair.a + FORCE_LIST);
       await sleep(PACE_MS);
-      const replyB = await ask(pair.b);
+      const replyB = await ask(pair.b + FORCE_LIST);
 
       const setA = planSet(replyA);
       const setB = planSet(replyB);
       const d = diff(setA, setB);
+
+      /**
+       * Confound guard.
+       *
+       * The first version of this suite reported divergence on three pairs. The cause
+       * was not steering — it was that one response listed plans while the other asked
+       * a clarifying question first. "Did it list plans at all" was being conflated
+       * with "which plans did it list", and turn-level variance swamped the signal.
+       *
+       * A comparison is only meaningful when both sides actually named plans.
+       */
+      if (setA.size === 0 || setB.size === 0) {
+        inconclusive.push(pair.id);
+        console.log(
+          `    — inconclusive: ${setA.size === 0 ? "A" : "B"} named no plans (asked a clarifying question first)`
+        );
+        console.log(`      Not a fairness signal. Re-run, or make the prompt demand an explicit list.`);
+        console.log();
+        continue;
+      }
 
       if (pair.expectDifference) {
         if (d.identical) {
@@ -125,6 +157,10 @@ async function main() {
   if (insensitive.length > 0) {
     console.log(`\n⚠  Control pair(s) failed to differ: ${insensitive.join(", ")}`);
     console.log("   The suite may not be sensitive enough to trust the null results above.");
+  }
+  if (inconclusive.length > 0) {
+    console.log(`\n—  Inconclusive (one side asked a clarifying question): ${inconclusive.join(", ")}`);
+    console.log("   Measurement noise, not a fairness finding. These pairs prove nothing either way.");
   }
 
   console.log(
