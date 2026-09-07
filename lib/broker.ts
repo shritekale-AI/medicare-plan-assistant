@@ -19,6 +19,15 @@
 
 import book from "@/data/broker-book.json";
 import { ALL_PLANS, getPlan, filterPlans, type Plan } from "./plans";
+import { plansKeepingAll } from "./providers";
+
+/**
+ * Client records store doctors as "Dr. Reddy (cardiology)". The provider lookup
+ * wants a bare name, so strip the specialty note before querying.
+ */
+function providerQueries(client: Client): string[] {
+  return client.doctors.map((d) => d.replace(/\s*\(.*\)\s*$/, "").trim()).filter(Boolean);
+}
 
 export const BOOK_META = book.meta;
 
@@ -37,6 +46,7 @@ export type Client = {
   lastContact: string;
   phone?: string;
   bestTimeToCall?: string;
+  email?: string;
 };
 
 export const CLIENTS = book.clients as Client[];
@@ -83,6 +93,9 @@ export type ClientAssessment = {
   /** Why this landed in this bucket — the audit trail. */
   reasoning: string[];
   blockers: string[];
+  /** undefined when the client named no providers to check. */
+  providersKept?: boolean;
+  providersDropped: string[];
 };
 
 function money(n: number | null | undefined): string {
@@ -226,6 +239,7 @@ export function assessClient(client: Client): ClientAssessment {
       changes: [],
       reasoning: ["Current plan is not on the discontinued list"],
       blockers: [],
+      providersDropped: [],
     };
   }
 
@@ -250,6 +264,7 @@ export function assessClient(client: Client): ClientAssessment {
       changes: [],
       reasoning: [...reasoning, "Service area check failed before plan matching"],
       blockers,
+      providersDropped: [],
     };
   }
 
@@ -281,15 +296,47 @@ export function assessClient(client: Client): ClientAssessment {
       changes: [],
       reasoning,
       blockers,
+      providersDropped: [],
     };
   }
 
+  /**
+   * Provider retention dominates ranking.
+   *
+   * Before the network lookup existed, plans were ranked on cost and network type
+   * alone — which could put a plan that drops a nine-year cardiologist above one that
+   * keeps them, purely on a $5 copay difference. For most people that ordering is
+   * simply wrong: losing the specialist is the outcome they were trying to avoid.
+   */
+  const queries = providerQueries(client);
+  const retention = new Map<string, string[]>(); // planId -> providers it would drop
+  if (queries.length > 0) {
+    for (const row of plansKeepingAll(queries, available.map((p) => p.planId))) {
+      retention.set(row.planId, row.missing);
+    }
+    reasoning.push(`${queries.length} named provider(s) checked against every candidate plan`);
+  }
+
+  const dropped = (planId: string) => retention.get(planId) ?? [];
+
   const ranked = currentPlan
-    ? [...available].sort((a, b) => disruptionScore(client, currentPlan, a) - disruptionScore(client, currentPlan, b))
+    ? [...available].sort((a, b) => {
+        // Any plan that keeps every named provider outranks any plan that doesn't.
+        const aDrops = dropped(a.planId).length;
+        const bDrops = dropped(b.planId).length;
+        if (aDrops !== bDrops) return aDrops - bDrops;
+        return disruptionScore(client, currentPlan, a) - disruptionScore(client, currentPlan, b);
+      })
     : available;
 
   const best = ranked[0];
   const score = currentPlan ? disruptionScore(client, currentPlan, best) : 0;
+  const bestDrops = dropped(best.planId);
+
+  if (queries.length > 0) {
+    if (bestDrops.length === 0) reasoning.push("Recommended plan keeps every named provider");
+    else reasoning.push(`Recommended plan would drop: ${bestDrops.join(", ")}`);
+  }
 
   const changes: ChangeRow[] = currentPlan ? buildChanges(currentPlan, best) : [];
 
@@ -302,22 +349,38 @@ export function assessClient(client: Client): ClientAssessment {
     reasoning.push(`${client.doctors.length} named provider(s) — network status not verified in this prototype`);
   }
 
-  const clean = score < 30 && !networkChanges && !premiumJump;
+  // A plan that drops a named provider is never a clean port, whatever the numbers say.
+  const clean = score < 30 && !networkChanges && !premiumJump && bestDrops.length === 0;
+
+  // Say what was actually checked. "Confirm providers first" was misleading once the
+  // network lookup existed — by this point they have been checked.
+  const providerNote =
+    queries.length === 0
+      ? "no named providers on file"
+      : bestDrops.length === 0
+        ? `keeps ${queries.join(" and ")}`
+        : `drops ${bestDrops.join(" and ")}`;
+
+  const headline = clean
+    ? `Clean match — ${best.name}`
+    : bestDrops.length > 0
+      ? `Best available option ${providerNote}`
+      : networkChanges
+        ? `Network changes to ${best.networkType}, but ${providerNote}`
+        : `Material cost change — ${providerNote}`;
 
   return {
     client,
     currentPlan,
     triage: clean ? "clear_port" : "needs_review",
-    headline: clean
-      ? `Clean match — ${best.name}`
-      : networkChanges
-        ? `Network changes to ${best.networkType} — confirm providers first`
-        : "Material cost change — worth a call",
+    headline,
     recommended: best,
     alternatives: ranked.slice(1, 4),
     changes,
     reasoning,
     blockers,
+    providersKept: queries.length > 0 ? bestDrops.length === 0 : undefined,
+    providersDropped: bestDrops,
   };
 }
 

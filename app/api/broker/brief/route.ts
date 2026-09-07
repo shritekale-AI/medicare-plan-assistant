@@ -1,7 +1,7 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { NextResponse } from "next/server";
 import { MODELS, GENERATION } from "@/lib/config";
-import { CLIENTS, assessClient } from "@/lib/broker";
+import { CLIENTS, assessClient, BOOK_META } from "@/lib/broker";
 import { TOOLS, executeTool } from "@/lib/tools";
 import { documentUrls } from "@/lib/plans";
 
@@ -64,6 +64,47 @@ One or two sentences in plain language, addressed to the client.
 **Verify before placing**
 2–3 concrete items.`;
 
+/**
+ * Email drafting carries a constraint the briefing does not.
+ *
+ * A briefing is internal — Tony reading about his own client. An EMAIL is an outbound
+ * communication to a Medicare beneficiary about plan options, which CMS treats as
+ * regulated marketing. So the draft deliberately avoids the things that would require
+ * filing: comparative benefit claims, cost promises, and anything resembling a
+ * recommendation. It exists to open a conversation, not to sell inside the inbox.
+ *
+ * The licensed agent reviews, edits, and sends it under his own name. He owns it.
+ */
+const EMAIL_SYSTEM = `You are drafting an email for a licensed insurance broker to send to one of his clients whose Medicare Advantage plan is being discontinued.
+
+The client is a Medicare beneficiary, typically in their late sixties or seventies. Write for them, not for the broker.
+
+Tone: warm, brief, calm. This letter may be the first they hear that something is changing, and the natural reaction is alarm. Lead with the fact that this is manageable and that he is already on it.
+
+HARD CONSTRAINTS — an email to a Medicare beneficiary about plan options is regulated marketing communication:
+- Do NOT recommend a plan or say which is best.
+- Do NOT make comparative benefit claims ("better coverage", "you'll save money").
+- Do NOT quote specific premiums, copays, or deductibles. Those belong in a conversation where he can explain them and answer questions.
+- Do NOT promise their doctors will be covered. He verifies that on the call.
+- Do NOT include any medical detail, diagnosis, or medication information. Email is not a secure channel and there is no reason to put it there.
+- Do NOT create urgency beyond the real deadline.
+
+DO:
+- Say plainly that their current plan is ending and they'll need to choose something else.
+- Say he has already looked at the options available to them.
+- Give the real deadline (December 7).
+- Ask for a short call, and offer their stated preferred time of day if you're given one.
+- Sign off as the broker by first name.
+
+Keep it under 150 words. Short paragraphs — this may be read on a phone.
+
+Output format, exactly:
+Subject: <subject line>
+
+<body>
+
+Nothing else. No preamble, no notes.`;
+
 export async function POST(req: Request) {
   const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey) {
@@ -73,12 +114,13 @@ export async function POST(req: Request) {
     );
   }
 
-  let body: { clientId?: string };
+  let body: { clientId?: string; mode?: "briefing" | "email" };
   try {
     body = await req.json();
   } catch {
     return NextResponse.json({ error: "bad_request", message: "Invalid JSON." }, { status: 400 });
   }
+  const mode = body.mode === "email" ? "email" : "briefing";
 
   const client = CLIENTS.find((c) => c.id === body.clientId);
   if (!client) {
@@ -138,10 +180,18 @@ export async function POST(req: Request) {
   const briefTools = TOOLS.filter((t) =>
     ["search_plan_documents", "check_provider_network", "find_plans_keeping_providers"].includes(t.name)
   );
+
+  // The email draft needs no tools: it deliberately contains no benefit or cost
+  // detail, so there is nothing to look up and no citation to attach.
+  const activeTools = mode === "email" ? [] : briefTools;
+
   const messages: Anthropic.MessageParam[] = [
     {
       role: "user",
-      content: `Brief me on this client.\n\n${JSON.stringify(facts, null, 2)}`,
+      content:
+        mode === "email"
+          ? `Draft the email. Broker's first name: ${BOOK_META.broker.name}. Client's first name: ${client.name.split(" ")[0]}. Preferred time of day: ${client.bestTimeToCall ?? "not stated"}.`
+          : `Brief me on this client.\n\n${JSON.stringify(facts, null, 2)}`,
     },
   ];
 
@@ -152,8 +202,8 @@ export async function POST(req: Request) {
       const response = await anthropic.messages.create({
         model: MODELS.primary,
         max_tokens: 1400,
-        system: BRIEF_SYSTEM,
-        tools: briefTools,
+        system: mode === "email" ? EMAIL_SYSTEM : BRIEF_SYSTEM,
+        ...(activeTools.length > 0 ? { tools: activeTools } : {}),
         messages,
       });
 
@@ -164,7 +214,20 @@ export async function POST(req: Request) {
           .join("\n")
           .trim();
 
+        if (mode === "email") {
+          const match = text.match(/^Subject:\s*(.+?)\n+([\s\S]+)$/);
+          return NextResponse.json({
+            mode,
+            subject: match ? match[1].trim() : "Your Medicare plan for 2027",
+            body: match ? match[2].trim() : text,
+            to: client.email ?? null,
+            complianceNote:
+              "Draft only. An email to a Medicare beneficiary about plan options is regulated marketing communication — review, edit, and send it under your own name.",
+          });
+        }
+
         return NextResponse.json({
+          mode,
           brief: text,
           citations,
           documents: assessment.recommended ? documentUrls(assessment.recommended) : null,

@@ -218,14 +218,18 @@ function ClientDetail({ assessment }: { assessment: ClientAssessment }) {
   // the broker can pin any alternative against the same baseline.
   const [viewing, setViewing] = useState<Plan | undefined>(recommended);
   const [brief, setBrief] = useState<string | null>(null);
-  const [briefing, setBriefing] = useState(false);
+  const [email, setEmail] = useState<{ subject: string; body: string; to: string | null } | null>(null);
+  const [briefing, setBriefing] = useState<"briefing" | "email" | null>(null);
   const [briefError, setBriefError] = useState<string | null>(null);
+  const [copied, setCopied] = useState(false);
 
   // Reset when a different client is selected.
   useEffect(() => {
     setViewing(recommended);
     setBrief(null);
+    setEmail(null);
     setBriefError(null);
+    setCopied(false);
   }, [client.id, recommended]);
 
   const changes = useMemo(
@@ -233,24 +237,34 @@ function ClientDetail({ assessment }: { assessment: ClientAssessment }) {
     [currentPlan, viewing]
   );
 
-  async function generateBrief() {
-    setBriefing(true);
+  async function generate(mode: "briefing" | "email") {
+    setBriefing(mode);
     setBriefError(null);
+    setCopied(false);
     try {
       const res = await fetch("/api/broker/brief", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ clientId: client.id }),
+        body: JSON.stringify({ clientId: client.id, mode }),
       });
       const data = await res.json();
-      if (!res.ok) setBriefError(data.message ?? "Could not generate the briefing.");
-      else setBrief(data.brief);
+      if (!res.ok) {
+        setBriefError(data.message ?? "Could not generate that.");
+      } else if (mode === "email") {
+        setEmail({ subject: data.subject, body: data.body, to: data.to });
+      } else {
+        setBrief(data.brief);
+      }
     } catch {
-      setBriefError("Could not reach the briefing service.");
+      setBriefError("Could not reach the service.");
     } finally {
-      setBriefing(false);
+      setBriefing(null);
     }
   }
+
+  const mailtoHref = email
+    ? `mailto:${email.to ?? ""}?subject=${encodeURIComponent(email.subject)}&body=${encodeURIComponent(email.body)}`
+    : "#";
 
   const isAlternative = viewing && recommended && viewing.planId !== recommended.planId;
 
@@ -280,6 +294,9 @@ function ClientDetail({ assessment }: { assessment: ClientAssessment }) {
                 <div className="mt-1 text-xs text-slate-600">
                   Prefers {client.bestTimeToCall}
                 </div>
+              )}
+              {client.email && (
+                <div className="mt-1 text-xs text-slate-600">{client.email}</div>
               )}
             </div>
           )}
@@ -398,18 +415,27 @@ function ClientDetail({ assessment }: { assessment: ClientAssessment }) {
           <div className="mt-5 rounded-xl border-2 border-slate-200 p-4">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <div>
-                <div className="font-medium">Briefing for the call</div>
+                <div className="font-medium">Prepare the outreach</div>
                 <div className="text-sm text-slate-600">
-                  Reads this plan&apos;s documents and explains what changes for {client.name.split(" ")[0]}
+                  Reads the plan documents and works out what changes for {client.name.split(" ")[0]}
                 </div>
               </div>
-              <button
-                onClick={() => void generateBrief()}
-                disabled={briefing}
-                className="rounded-lg bg-emerald-800 px-4 py-2 text-sm font-medium text-white disabled:opacity-50 focus:outline-none focus:ring-4 focus:ring-emerald-300"
-              >
-                {briefing ? "Reading documents…" : brief ? "Regenerate" : "Generate briefing"}
-              </button>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => void generate("briefing")}
+                  disabled={briefing !== null}
+                  className="rounded-lg bg-emerald-800 px-4 py-2 text-sm font-medium text-white disabled:opacity-50 focus:outline-none focus:ring-4 focus:ring-emerald-300"
+                >
+                  {briefing === "briefing" ? "Reading documents…" : brief ? "Regenerate briefing" : "Briefing for the call"}
+                </button>
+                <button
+                  onClick={() => void generate("email")}
+                  disabled={briefing !== null}
+                  className="rounded-lg border-2 border-emerald-800 px-4 py-2 text-sm font-medium text-emerald-900 disabled:opacity-50 focus:outline-none focus:ring-4 focus:ring-emerald-300"
+                >
+                  {briefing === "email" ? "Drafting…" : email ? "Redraft email" : "Draft email"}
+                </button>
+              </div>
             </div>
 
             {briefError && (
@@ -421,6 +447,53 @@ function ClientDetail({ assessment }: { assessment: ClientAssessment }) {
             {brief && (
               <div className="mt-3 border-t border-slate-200 pt-3 text-sm leading-relaxed">
                 <RichText text={brief} />
+              </div>
+            )}
+
+            {email && (
+              <div className="mt-3 border-t border-slate-200 pt-3">
+                <div className="rounded-lg border border-slate-200 bg-slate-50 p-3 text-sm">
+                  <div className="mb-2 border-b border-slate-200 pb-2">
+                    <div>
+                      <span className="text-slate-500">To: </span>
+                      {email.to ?? "—"}
+                    </div>
+                    <div>
+                      <span className="text-slate-500">Subject: </span>
+                      <span className="font-medium">{email.subject}</span>
+                    </div>
+                  </div>
+                  <div className="whitespace-pre-wrap leading-relaxed">{email.body}</div>
+                </div>
+
+                <div className="mt-2 flex flex-wrap items-center gap-2">
+                  <a
+                    href={mailtoHref}
+                    className="rounded-lg bg-emerald-800 px-4 py-2 text-sm font-medium text-white focus:outline-none focus:ring-4 focus:ring-emerald-300"
+                  >
+                    Open in email client
+                  </a>
+                  <button
+                    onClick={() => {
+                      void navigator.clipboard
+                        ?.writeText(`Subject: ${email.subject}\n\n${email.body}`)
+                        .then(() => setCopied(true))
+                        .catch(() => setCopied(false));
+                    }}
+                    className="rounded-lg border-2 border-slate-300 px-4 py-2 text-sm focus:outline-none focus:ring-4 focus:ring-emerald-300"
+                  >
+                    {copied ? "Copied" : "Copy"}
+                  </button>
+                </div>
+
+                {/* An email to a beneficiary about plan options is regulated marketing.
+                    The draft deliberately omits costs, benefit comparisons, and any
+                    recommendation — the licensed agent reviews and owns what goes out. */}
+                <p className="mt-2 text-xs text-slate-600">
+                  Draft only. Outbound email to a Medicare beneficiary about plan options is
+                  regulated communication — review, edit, and send under your own name. The draft
+                  deliberately contains no costs, benefit comparisons, or recommendation.
+                </p>
               </div>
             )}
           </div>

@@ -77,6 +77,17 @@
       "inNetworkPlans": ["H1036-335-002", "H5525-050", "H5216-017", "R0110-004"]
     },
     {
+      "npi": "1856043927",
+      "name": "Dr. Helena Vasquez",
+      "searchNames": ["vasquez", "helena vasquez", "dr vasquez"],
+      "specialty": "Rheumatology",
+      "practice": "Carolina Arthritis Associates",
+      "city": "Charlotte, NC",
+      "acceptingNewPatients": false,
+      "networkNote": "Small single-specialty practice contracted with only a narrow set of plans — a realistic pattern, and the reason some members have no option that preserves their specialist.",
+      "inNetworkPlans": ["H1036-318", "H8145-004"]
+    },
+    {
       "npi": "1445927806",
       "name": "Novant Health Presbyterian Medical Center",
       "searchNames": ["presbyterian", "novant presbyterian", "presbyterian medical center"],

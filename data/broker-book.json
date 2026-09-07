@@ -16,7 +16,7 @@
       "H1036-331",
       "H8145-004"
     ],
-    "contactNote": "Phone numbers use the 555-01xx range reserved for fiction. No real numbers."
+    "contactNote": "Phone numbers use the 555-01xx range reserved for fiction; email addresses use example.com, reserved by IANA for documentation. Neither can reach a real person."
   },
   "clients": [
     {
@@ -35,7 +35,8 @@
       ],
       "lastContact": "2026-08-14",
       "phone": "(704) 555-0142",
-      "bestTimeToCall": "morning"
+      "bestTimeToCall": "morning",
+      "email": "margaret.doyle@example.com"
     },
     {
       "id": "C-1067",
@@ -53,7 +54,8 @@
       ],
       "lastContact": "2026-07-02",
       "phone": "(704) 555-0167",
-      "bestTimeToCall": "afternoon"
+      "bestTimeToCall": "afternoon",
+      "email": "walter.boyd@example.com"
     },
     {
       "id": "C-1088",
@@ -72,7 +74,8 @@
       ],
       "lastContact": "2026-08-29",
       "phone": "(704) 555-0188",
-      "bestTimeToCall": "morning"
+      "bestTimeToCall": "morning",
+      "email": "rosalind.pike@example.com"
     },
     {
       "id": "C-1103",
@@ -88,7 +91,8 @@
       "doctors": [],
       "lastContact": "2026-06-19",
       "phone": "(704) 555-0103",
-      "bestTimeToCall": "evening"
+      "bestTimeToCall": "evening",
+      "email": "curtis.hanley@example.com"
     },
     {
       "id": "C-1119",
@@ -106,7 +110,8 @@
       ],
       "lastContact": "2026-08-30",
       "phone": "(704) 555-0119",
-      "bestTimeToCall": "afternoon"
+      "bestTimeToCall": "afternoon",
+      "email": "yolanda.frame@example.com"
     },
     {
       "id": "C-1124",
@@ -122,7 +127,8 @@
       "doctors": [],
       "lastContact": "2026-05-11",
       "phone": "(704) 555-0124",
-      "bestTimeToCall": "morning"
+      "bestTimeToCall": "morning",
+      "email": "desmond.oyelaran@example.com"
     },
     {
       "id": "C-1141",
@@ -144,7 +150,8 @@
       ],
       "lastContact": "2026-09-01",
       "phone": "(704) 555-0141",
-      "bestTimeToCall": "morning"
+      "bestTimeToCall": "morning",
+      "email": "beverly.tan@example.com"
     },
     {
       "id": "C-1156",
@@ -160,7 +167,29 @@
       "doctors": [],
       "lastContact": "2026-04-27",
       "phone": "(704) 555-0156",
-      "bestTimeToCall": "afternoon"
+      "bestTimeToCall": "afternoon",
+      "email": "arthur.mensah@example.com"
+    },
+    {
+      "id": "C-1147",
+      "name": "Eileen Prochaska",
+      "age": 69,
+      "zip": "28270",
+      "currentPlanId": "H1036-318",
+      "hasMedicaid": false,
+      "takesPrescriptions": true,
+      "medicationCount": 5,
+      "chronicConditions": [],
+      "preferredNetwork": "HMO",
+      "doctors": [
+        "Dr. Vasquez (rheumatology)",
+        "Dr. Ellis (primary care)"
+      ],
+      "lastContact": "2026-08-27",
+      "phone": "(704) 555-0147",
+      "bestTimeToCall": "morning",
+      "note": "Long-standing rheumatology relationship; her specialist contracts with only a narrow set of plans",
+      "email": "eileen.prochaska@example.com"
     },
     {
       "id": "C-1158",
@@ -179,7 +208,8 @@
       "lastContact": "2026-03-30",
       "note": "Moved across the state line to Fort Mill SC in spring — address change not yet reflected in the plan record",
       "phone": "(803) 555-0158",
-      "bestTimeToCall": "morning"
+      "bestTimeToCall": "morning",
+      "email": "gloria.bassett@example.com"
     },
     {
       "id": "C-1160",
@@ -196,7 +226,8 @@
       "lastContact": "2026-02-18",
       "note": "Relocated to Union County",
       "phone": "(704) 555-0160",
-      "bestTimeToCall": "evening"
+      "bestTimeToCall": "evening",
+      "email": "hector.villalobos@example.com"
     },
     {
       "id": "C-1162",
@@ -214,7 +245,8 @@
       ],
       "lastContact": "2026-08-22",
       "phone": "(704) 555-0162",
-      "bestTimeToCall": "afternoon"
+      "bestTimeToCall": "afternoon",
+      "email": "nora.whitfield@example.com"
     },
     {
       "id": "C-1177",
@@ -232,7 +264,8 @@
       ],
       "lastContact": "2026-08-05",
       "phone": "(704) 555-0177",
-      "bestTimeToCall": "morning"
+      "bestTimeToCall": "morning",
+      "email": "sunil.ranganathan@example.com"
     }
   ]
 }
