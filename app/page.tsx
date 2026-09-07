@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useSpeech } from "@/lib/useSpeech";
 import { TracePanel, type TraceEntry } from "@/components/TracePanel";
+import { RichText } from "@/components/RichText";
 
 type Message = {
   role: "user" | "assistant";
@@ -160,11 +161,7 @@ export default function Home() {
                     : "max-w-[95%] rounded-2xl border border-slate-200 bg-white px-4 py-3 text-lg leading-relaxed"
                 }
               >
-                {m.content.split("\n").map((line, j) => (
-                  <p key={j} className={j > 0 ? "mt-2" : ""}>
-                    {line}
-                  </p>
-                ))}
+                <RichText text={m.content} />
               </div>
               {m.role === "assistant" && showTrace && m.trace && <TracePanel trace={m.trace} />}
             </div>
