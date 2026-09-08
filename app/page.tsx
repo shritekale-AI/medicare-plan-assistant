@@ -4,6 +4,24 @@ import { useEffect, useRef, useState } from "react";
 import { useSpeech } from "@/lib/useSpeech";
 import { TracePanel, type TraceEntry } from "@/components/TracePanel";
 import { RichText } from "@/components/RichText";
+import { FeedbackControls } from "@/components/FeedbackControls";
+
+/**
+ * Text size is user-controlled rather than fixed.
+ *
+ * The original build hard-coded large type for the 65+ primary persona, which is right
+ * for Linda and wrong for everyone reviewing the thing — a compliance reviewer working
+ * through a long conversation could see two answers at a time. WCAG 1.4.4 asks that
+ * text can be resized, not that it start large, so the accessible answer is a control,
+ * not a default. Compact is the default because reviewers are the current users; Large
+ * is what a member would pick.
+ */
+const TEXT_SIZES = {
+  compact: { body: "text-sm", pad: "px-3 py-2", label: "A" },
+  normal: { body: "text-base", pad: "px-3.5 py-2.5", label: "A" },
+  large: { body: "text-lg leading-relaxed", pad: "px-4 py-3", label: "A" },
+} as const;
+type TextSize = keyof typeof TEXT_SIZES;
 
 type Attachment = { mediaType: string; data: string; name: string; previewUrl: string };
 
@@ -56,6 +74,8 @@ export default function Home() {
   const [error, setError] = useState<string | null>(null);
   const [voiceMode, setVoiceMode] = useState(false);
   const [showTrace, setShowTrace] = useState(true);
+  const [textSize, setTextSize] = useState<TextSize>("compact");
+  const size = TEXT_SIZES[textSize];
 
   const [build, setBuild] = useState<{ commit: string; corpusVersion: string } | null>(null);
   const [attachment, setAttachment] = useState<Attachment | null>(null);
@@ -178,7 +198,7 @@ export default function Home() {
 
       {/* CMS rules require an AI assistant to disclose that it is automated.
           This banner is a compliance requirement, not decoration. */}
-      <div role="note" className="bg-slate-900 px-4 py-2 text-center text-sm text-slate-100">
+      <div role="note" className="bg-slate-900 px-4 py-2 text-center text-xs text-slate-100">
         <strong>Prototype — you are talking to an AI assistant, not a person.</strong>{" "}
         Built as an interview exercise. Not affiliated with or endorsed by Humana. Uses public plan
         documents. Not insurance advice — verify anything important with a licensed agent.
@@ -187,8 +207,8 @@ export default function Home() {
       <header className="border-b border-slate-200 bg-white px-4 py-4">
         <div className="mx-auto flex max-w-4xl items-center justify-between gap-4">
           <div>
-            <h1 className="text-xl font-semibold">Medicare Plan Assistant</h1>
-            <p className="text-sm text-slate-600">
+            <h1 className="text-base font-semibold">Medicare Plan Assistant</h1>
+            <p className="text-xs text-slate-600">
               21 plans · Mecklenburg County, NC (28270) · plan year 2026
               {build && (
                 <span className="text-slate-500">
@@ -198,8 +218,27 @@ export default function Home() {
               )}
             </p>
           </div>
-          <div className="flex items-center gap-4 text-sm">
-            <label className="flex cursor-pointer items-center gap-2">
+          <div className="flex items-center gap-3 text-xs">
+            {/* WCAG 1.4.4 wants text resizable, not large by default. */}
+            <div className="flex items-center gap-1" role="group" aria-label="Text size">
+              {(["compact", "normal", "large"] as const).map((k, idx) => (
+                <button
+                  key={k}
+                  onClick={() => setTextSize(k)}
+                  aria-pressed={textSize === k}
+                  title={`${k[0].toUpperCase()}${k.slice(1)} text`}
+                  className={`rounded border px-1.5 py-0.5 leading-none ${
+                    textSize === k
+                      ? "border-emerald-700 bg-emerald-800 text-white"
+                      : "border-slate-300 bg-white text-slate-700 hover:border-slate-400"
+                  }`}
+                  style={{ fontSize: `${11 + idx * 3}px` }}
+                >
+                  A
+                </button>
+              ))}
+            </div>
+            <label className="flex cursor-pointer items-center gap-1.5">
               <input
                 type="checkbox"
                 checked={showTrace}
@@ -211,14 +250,17 @@ export default function Home() {
             <a href="/broker" className="text-emerald-800 underline">
               Broker view →
             </a>
+            <a href="/admin/feedback" className="text-emerald-800 underline">
+              Feedback →
+            </a>
           </div>
         </div>
       </header>
 
-      <main className="mx-auto max-w-4xl px-4 py-6">
+      <main className="mx-auto max-w-4xl px-4 py-4">
         {messages.length === 0 && (
           <div className="mb-6">
-            <p className="mb-4 text-lg text-slate-700">
+            <p className="mb-3 text-sm text-slate-700">
               Choose someone to start as, or just type a question below.
             </p>
             <div className="grid gap-3 sm:grid-cols-2">
@@ -229,11 +271,11 @@ export default function Home() {
                     setVoiceMode(s.id === "linda");
                     void send(s.prompt);
                   }}
-                  className="rounded-xl border-2 border-slate-300 bg-white p-4 text-left transition hover:border-emerald-600 hover:shadow-md focus:outline-none focus:ring-4 focus:ring-emerald-300"
+                  className="rounded-xl border-2 border-slate-300 bg-white p-3 text-left transition hover:border-emerald-600 hover:shadow-md focus:outline-none focus:ring-4 focus:ring-emerald-300"
                 >
-                  <div className="text-lg font-semibold">{s.name}</div>
-                  <div className="text-slate-700">{s.role}</div>
-                  <div className="mt-1 text-sm text-emerald-800">{s.mode}</div>
+                  <div className="text-sm font-semibold">{s.name}</div>
+                  <div className="text-xs text-slate-700">{s.role}</div>
+                  <div className="mt-0.5 text-xs text-emerald-800">{s.mode}</div>
                 </button>
               ))}
             </div>
@@ -243,28 +285,43 @@ export default function Home() {
         {/* role="log" + aria-live announces new messages to screen readers without
             stealing focus — important when replies can be long and the user may be
             mid-way through reading. */}
-        <div className="space-y-4" role="log" aria-live="polite" aria-label="Conversation">
+        <div className="space-y-3" role="log" aria-live="polite" aria-label="Conversation">
           {messages.map((m, i) => (
             <div key={i}>
               <div
                 className={
                   m.role === "user"
-                    ? "ml-auto max-w-[85%] rounded-2xl bg-emerald-800 px-4 py-3 text-lg text-white"
-                    : "max-w-[95%] rounded-2xl border border-slate-200 bg-white px-4 py-3 text-lg leading-relaxed"
+                    ? `ml-auto max-w-[85%] rounded-2xl bg-emerald-800 ${size.pad} ${size.body} text-white`
+                    : `max-w-[95%] rounded-2xl border border-slate-200 bg-white ${size.pad} ${size.body}`
                 }
               >
                 <span className="sr-only">{m.role === "user" ? "You said: " : "Assistant replied: "}</span>
                 {m.attachmentName && (
-                  <p className="mb-1 text-sm opacity-90">📎 {m.attachmentName}</p>
+                  <p className="mb-1 text-xs opacity-90">📎 {m.attachmentName}</p>
                 )}
                 <RichText text={m.content} />
               </div>
-              {m.role === "assistant" && showTrace && m.trace && <TracePanel trace={m.trace} />}
+              {m.role === "assistant" && (
+                <>
+                  {showTrace && m.trace && <TracePanel trace={m.trace} />}
+                  {/* Rated per answer rather than per conversation: a reviewer's
+                      objection is almost always to one specific claim, and asking at
+                      the end of a session loses which turn they meant. */}
+                  <FeedbackControls
+                    question={messages[i - 1]?.role === "user" ? messages[i - 1].content : ""}
+                    answer={m.content}
+                    toolsUsed={(m.trace ?? []).map((t) => t.tool)}
+                    evidence={(m.trace ?? []).flatMap((t) => t.evidence ?? [])}
+                    uid={`m${i}`}
+                    commit={build?.commit ?? "dev"}
+                  />
+                </>
+              )}
             </div>
           ))}
 
           {loading && (
-            <div className="max-w-[95%] rounded-2xl border border-slate-200 bg-white px-4 py-3 text-lg text-slate-600">
+            <div className={`max-w-[95%] rounded-2xl border border-slate-200 bg-white ${size.pad} ${size.body} text-slate-600`}>
               <span className="inline-block motion-safe:animate-pulse">Looking that up…</span>
             </div>
           )}
@@ -355,19 +412,19 @@ export default function Home() {
               }}
               placeholder={listening ? "Listening…" : "Type your question…"}
               rows={1}
-              className="min-h-14 flex-1 resize-none rounded-xl border-2 border-slate-400 px-4 py-3 text-lg focus:border-emerald-700 focus:outline-none focus:ring-4 focus:ring-emerald-200"
+              className="min-h-12 flex-1 resize-none rounded-xl border-2 border-slate-400 px-3 py-2.5 text-sm focus:border-emerald-700 focus:outline-none focus:ring-4 focus:ring-emerald-200"
             />
 
             <button
               onClick={() => void send(input)}
               disabled={loading || (!input.trim() && !attachment)}
-              className="h-14 shrink-0 rounded-xl bg-emerald-800 px-6 text-lg font-medium text-white focus:outline-none focus:ring-4 focus:ring-emerald-300 disabled:opacity-50"
+              className="h-12 shrink-0 rounded-xl bg-emerald-800 px-5 text-sm font-medium text-white focus:outline-none focus:ring-4 focus:ring-emerald-300 disabled:opacity-50"
             >
               Send
             </button>
           </div>
 
-          <div className="mt-2 flex flex-wrap items-center justify-between gap-2 text-sm text-slate-500">
+          <div className="mt-2 flex flex-wrap items-center justify-between gap-2 text-xs text-slate-500">
             <div className="flex items-center gap-3">
               {supported.output && (
                 <label className="flex cursor-pointer items-center gap-1.5">

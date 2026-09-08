@@ -13,7 +13,17 @@
 
 import { useState } from "react";
 
-export type TraceEntry = { tool: string; input: unknown; summary: string };
+/**
+ * `evidence` is present only for document searches. It is not rendered here — it is
+ * carried so groundedness scoring and reviewer feedback can be checked against the
+ * text the answer was actually built from.
+ */
+export type TraceEntry = {
+  tool: string;
+  input: unknown;
+  summary: string;
+  evidence?: { document: string; page: number; text: string }[];
+};
 
 const TOOL_LABELS: Record<string, string> = {
   check_eligibility: "Checked eligibility rules",

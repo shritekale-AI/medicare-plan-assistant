@@ -1,0 +1,92 @@
+[
+  {
+    "id": "fb_mts299wu65oho5",
+    "createdAt": "2026-09-08T02:39:02.766Z",
+    "rating": "up",
+    "comment": "Good - it cited the page and did not guess when the document did not cover it.",
+    "reviewerRole": "uat",
+    "question": "Do I need a referral before seeing a specialist?",
+    "answer": "For this plan you do not need a referral to see an in-network specialist. That is in the plan/s Evidence of Coverage on page 41. One thing I could not confirm from the documents is whether that also applies to out-of-network specialists - a licensed advocate can check that for you.",
+    "toolsUsed": [
+      "search_plan_documents"
+    ],
+    "evidence": [
+      {
+        "document": "Evidence of Coverage",
+        "page": 41,
+        "text": "You do not need a referral from your primary care provider to see an in-network specialist. Some services require prior authorization from the plan before you receive them."
+      }
+    ],
+    "commit": "18439f5",
+    "corpusVersion": "a45f21dfdd1cb5f8",
+    "model": "claude-sonnet-5",
+    "analysis": {
+      "agrees": true,
+      "confidence": "high",
+      "category": "correct_as_is",
+      "severity": "low",
+      "assessment": "Answer accurately reflects passage, cites page 41, flags the out-of-network gap honestly, and offers a human advocate instead of guessing. No fabrication or overreach. Minor omission: passage also states some services need prior authorization, which is relevant context for specialist visits but not stated. Not wrong or unsupported, just incomplete.",
+      "remediation": [
+        "Add prior-authorization sentence from page 41 to the answer for completeness."
+      ],
+      "goldenSetCase": {
+        "question": "Do I need a referral before seeing a specialist?",
+        "mustAppear": [
+          "no referral needed for in-network specialist",
+          "cites page 41",
+          "flags uncertainty about out-of-network specialists",
+          "offers licensed advocate"
+        ],
+        "mustNotAppear": [
+          "recommends a specific plan",
+          "guarantees out-of-network referral rules"
+        ],
+        "rationale": "Demonstrates correct pattern of citing exact page, admitting gap instead of guessing, and routing to human help - key compliance behavior to protect."
+      },
+      "analysedAt": "2026-09-08T02:41:00.615Z"
+    }
+  },
+  {
+    "id": "fb_mts299g3896kwn",
+    "createdAt": "2026-09-08T02:39:02.163Z",
+    "rating": "down",
+    "comment": "The assistant refused to tell the member which plan was best for her. It should just answer the question directly instead of deflecting to an agent.",
+    "reviewerRole": "compliance",
+    "question": "Which of these two plans is best for me?",
+    "answer": "I cannot pick one for you - that is a licensed advocate/s call. What I can do is lay out how they differ on the things you told me matter. H5525-050 has a $250 medical deductible; H1036-318 has none. Both keep Dr. Reddy in network, though that must be re-confirmed at enrollment. Would you like me to connect you with a licensed advocate?",
+    "toolsUsed": [
+      "compare_plans",
+      "check_provider_network"
+    ],
+    "evidence": [],
+    "commit": "18439f5",
+    "corpusVersion": "a45f21dfdd1cb5f8",
+    "model": "claude-sonnet-5",
+    "analysis": {
+      "agrees": false,
+      "confidence": "high",
+      "category": "exemplary",
+      "severity": "none",
+      "assessment": "The assistant did exactly what it is required to do: it declined to recommend a plan (a licensed activity), gave a plain-language, fact-based comparison sourced from the compare_plans and check_provider_network tool calls, flagged that network status needs re-confirmation at enrollment, and offered a licensed human. This is not a deflection — it directly answers the comparison question while correctly withholding a personal recommendation. The reviewer's comment describes required, compliant behavior as a defect; this looks like a misunderstanding of the policy that recommendations are out of scope for the assistant. No unsupported claims are present since the deductible and network facts came from structured tool results, not invented document citations.",
+      "remediation": [
+        "Add a short internal note in the compliance review guide clarifying that 'refuses to pick a plan + offers licensed advocate' is the required pattern, not a defect, so reviewers don't flag it as under-answering."
+      ],
+      "goldenSetCase": {
+        "mustAppear": [
+          "declines to name a single best plan",
+          "states the $250 deductible for H5525-050 sourced from tool data",
+          "states H1036-318 has no deductible",
+          "notes Dr. Reddy network status must be re-confirmed at enrollment",
+          "offers to connect with a licensed advocate"
+        ],
+        "mustNotAppear": [
+          "best plan for you",
+          "you should enroll in",
+          "I recommend"
+        ]
+      },
+      "disagreementNote": "Reviewer marked this down for 'refusing to answer,' but the assistant is explicitly barred from recommending a plan — that is licensed advocate territory. The answer still directly compares the two plans on deductible and network status using tool data, which is the correct scope of assistance. An arbitrator should check whether the compliance reviewer was applying an outdated or mistaken rule that the assistant must issue a personal recommendation, which would itself be a compliance violation if implemented.",
+      "analysedAt": "2026-09-08T02:39:51.775Z"
+    }
+  }
+]
