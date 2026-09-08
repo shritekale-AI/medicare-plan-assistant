@@ -1,0 +1,56 @@
+{
+  "meta": {
+    "synthetic": true,
+    "warning": "SYNTHETIC. These members do not exist. Records are invented to stand in for an authenticated lookup against Humana's member systems.",
+    "whyThisExists": "The first version of the member surface had no identity step at all. The assistant would discuss 'your plan' having never established which plan that was — it only worked because the demo prompt happened to volunteer enough detail. A UAT reviewer caught it immediately: 'how did the app know who Linda is and what plan she has?' That is the right question, and the honest answer was that it didn't.",
+    "productionReplacement": "An authenticated session against Humana's member platform, returning current plan enrollment, providers on file, and the pharmacy record. This is also the point at which PHI enters the system — a signed-in session is the boundary the whole privacy posture hangs on.",
+    "guestPathMatters": "Not every shopper has an account. Someone newly eligible has never had one, and a caregiver may be helping before access is delegated. So identity is established EITHER by sign-in or by asking — never assumed."
+  },
+  "members": [
+    {
+      "id": "M-77301",
+      "name": "Linda Alvarez",
+      "firstName": "Linda",
+      "age": 68,
+      "zip": "28270",
+      "currentPlanId": "H1036-318",
+      "planEnding": true,
+      "hasPartA": true,
+      "hasPartB": true,
+      "hasMedicaid": false,
+      "takesPrescriptions": true,
+      "medicationCount": 4,
+      "doctorsOnFile": ["Dr. Reddy (cardiology)", "Dr. Ellis (primary care)"],
+      "memberSince": "2019",
+      "note": "Non-renewal letter mailed for plan year 2027."
+    },
+    {
+      "id": "M-88412",
+      "name": "Steve Bruckner",
+      "firstName": "Steve",
+      "age": 65,
+      "zip": "28270",
+      "currentPlanId": null,
+      "planEnding": false,
+      "hasPartA": true,
+      "hasPartB": false,
+      "hasMedicaid": false,
+      "takesPrescriptions": true,
+      "medicationCount": 1,
+      "doctorsOnFile": ["Dr. Osei (primary care)"],
+      "memberSince": null,
+      "note": "Newly eligible, no prior Humana enrollment. Still covered by an employer plan. Has no account to sign into — reaches the assistant as a guest."
+    }
+  ],
+  "delegates": [
+    {
+      "id": "D-2210",
+      "name": "Amy Alvarez",
+      "firstName": "Amy",
+      "actsFor": "M-77301",
+      "relationship": "daughter",
+      "authorization": "Authorized representative on file",
+      "note": "Caregiver access is delegated, not inherited. She sees what Linda sees, and the assistant says whose account it is reading."
+    }
+  ]
+}

@@ -2,6 +2,7 @@ import Anthropic from "@anthropic-ai/sdk";
 import { NextResponse } from "next/server";
 import { TOOLS, executeTool } from "@/lib/tools";
 import { SYSTEM_PROMPT } from "@/lib/prompts";
+import { identityContext, resolveIdentity } from "@/lib/members";
 import { MODELS, GENERATION, LIMITS } from "@/lib/config";
 import { compactConversation } from "@/lib/summarize";
 
@@ -43,6 +44,9 @@ function rateLimited(ip: string): boolean {
 type IncomingImage = { mediaType: string; data: string };
 type IncomingMessage = { role: "user" | "assistant"; content: string; image?: IncomingImage };
 
+/** Opaque account token. The browser never sends a profile — only this. */
+type IncomingBody = { messages?: IncomingMessage[]; identityToken?: string };
+
 const ALLOWED_IMAGE_TYPES = ["image/jpeg", "image/png", "image/webp", "image/gif"];
 type TraceEntry = {
   tool: string;
@@ -69,12 +73,21 @@ export async function POST(req: Request) {
     );
   }
 
-  let body: { messages?: IncomingMessage[] };
+  let body: IncomingBody;
   try {
     body = await req.json();
   } catch {
     return NextResponse.json({ error: "bad_request", message: "Invalid JSON body." }, { status: 400 });
   }
+
+  // Identity is resolved HERE, from a token, against the server's own records — the
+  // browser never supplies a profile. A client that could post its own plan, doctors
+  // and medications would be a client that could put words in the account's mouth.
+  // When there is no token the prompt requires the assistant to ask rather than assume.
+  const identity = resolveIdentity(body.identityToken);
+  const systemPrompt = identity
+    ? `${SYSTEM_PROMPT}\n\n${identityContext(identity)}`
+    : SYSTEM_PROMPT;
 
   const incoming = body.messages ?? [];
   if (incoming.length === 0) {
@@ -179,7 +192,7 @@ export async function POST(req: Request) {
       const response = await client.messages.create({
         model: MODELS.primary,
         max_tokens: GENERATION.maxTokens,
-        system: SYSTEM_PROMPT,
+        system: systemPrompt,
         tools: TOOLS,
         messages,
       });

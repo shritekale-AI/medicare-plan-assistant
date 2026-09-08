@@ -25,6 +25,18 @@ type TextSize = keyof typeof TEXT_SIZES;
 
 type Attachment = { mediaType: string; data: string; name: string; previewUrl: string };
 
+type Identity = {
+  memberId: string;
+  name: string;
+  firstName: string;
+  currentPlanId: string | null;
+  planEnding: boolean;
+  zip: string;
+  actingAs: { name: string; relationship: string } | null;
+};
+
+type SignInOption = { token: string; label: string; sub: string };
+
 type Message = {
   role: "user" | "assistant";
   content: string;
@@ -47,7 +59,7 @@ const STARTERS = [
     role: "Member whose plan is ending",
     mode: "Prefers voice",
     prompt:
-      "I got a letter saying my Humana plan won't be offered next year. I'm 68, I live in 28270, and I really need to keep seeing my cardiologist. I don't know where to start.",
+      "I got a letter saying my plan won't be offered next year. I don't know where to start.",
   },
   {
     id: "amy",
@@ -55,7 +67,7 @@ const STARTERS = [
     role: "Daughter, researching for Linda",
     mode: "Prefers text",
     prompt:
-      "I'm helping my mother. She's 68 in ZIP 28270, her plan is being discontinued, she takes four medications and sees a cardiologist. Can you show me how her options compare?",
+      "I'm helping my mother — her plan is being discontinued. Can you show me how her options compare?",
   },
   {
     id: "steve",
@@ -80,6 +92,12 @@ export default function Home() {
   const [build, setBuild] = useState<{ commit: string; corpusVersion: string } | null>(null);
   const [attachment, setAttachment] = useState<Attachment | null>(null);
 
+  // Identity is a token, never a profile. The record lives server-side.
+  const [identityToken, setIdentityToken] = useState<string | null>(null);
+  const [identity, setIdentity] = useState<Identity | null>(null);
+  const [signInOpen, setSignInOpen] = useState(false);
+  const [options, setOptions] = useState<{ members: SignInOption[]; delegates: SignInOption[] } | null>(null);
+
   const { listening, speaking, supported, listen, stopListening, speak, stopSpeaking } = useSpeech();
   const endRef = useRef<HTMLDivElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
@@ -99,6 +117,40 @@ export default function Home() {
     const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
     endRef.current?.scrollIntoView({ behavior: reduced ? "auto" : "smooth" });
   }, [messages, loading]);
+
+  useEffect(() => {
+    if (!signInOpen || options) return;
+    fetch("/api/identity")
+      .then((r) => r.json())
+      .then(setOptions)
+      .catch(() => {});
+  }, [signInOpen, options]);
+
+  async function signIn(token: string) {
+    try {
+      const res = await fetch("/api/identity", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ token }),
+      });
+      if (!res.ok) {
+        setError("Could not sign in to that account.");
+        return;
+      }
+      setIdentity(await res.json());
+      setIdentityToken(token);
+      setSignInOpen(false);
+      setMessages([]);
+    } catch {
+      setError("Could not reach the server.");
+    }
+  }
+
+  function signOut() {
+    setIdentity(null);
+    setIdentityToken(null);
+    setMessages([]);
+  }
 
   /** Read a chosen image into base64, so it can be sent inline to the API. */
   function handleFile(file: File) {
@@ -147,6 +199,7 @@ export default function Home() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
+          identityToken,
           messages: next.map((m, i) => ({
             role: m.role,
             content: m.content,
@@ -247,6 +300,25 @@ export default function Home() {
               />
               Show reasoning
             </label>
+            {identity ? (
+              <span className="flex items-center gap-1.5">
+                <span className="rounded bg-emerald-50 px-1.5 py-0.5 text-emerald-900">
+                  {identity.actingAs
+                    ? `${identity.actingAs.name} · for ${identity.firstName}`
+                    : identity.name}
+                </span>
+                <button onClick={signOut} className="text-slate-600 underline">
+                  Sign out
+                </button>
+              </span>
+            ) : (
+              <button
+                onClick={() => setSignInOpen((v) => !v)}
+                className="rounded border border-emerald-700 px-2 py-1 font-medium text-emerald-800 hover:bg-emerald-50"
+              >
+                Sign in
+              </button>
+            )}
             <a href="/broker" className="text-emerald-800 underline">
               Broker view →
             </a>
@@ -258,10 +330,73 @@ export default function Home() {
       </header>
 
       <main className="mx-auto max-w-4xl px-4 py-4">
+        {signInOpen && (
+          <div className="mb-4 rounded-xl border-2 border-emerald-300 bg-white p-4">
+            <h2 className="text-sm font-semibold">Sign in to your Humana account</h2>
+            <p className="mt-1 text-xs text-slate-600">
+              <strong>Simulated.</strong> No authentication is implemented. In production this is an
+              authenticated session that returns your current plan, the providers on file and your
+              pharmacy record — and it is the point at which protected health information enters the
+              system. Everything below is fictional.
+            </p>
+            <div className="mt-3 grid gap-2 sm:grid-cols-2">
+              {(options?.members ?? []).map((o) => (
+                <button
+                  key={o.token}
+                  onClick={() => void signIn(o.token)}
+                  className="rounded-lg border border-slate-300 p-2.5 text-left hover:border-emerald-600 focus:outline-none focus:ring-2 focus:ring-emerald-300"
+                >
+                  <div className="text-sm font-semibold">{o.label}</div>
+                  <div className="text-xs text-slate-600">{o.sub}</div>
+                </button>
+              ))}
+              {(options?.delegates ?? []).map((o) => (
+                <button
+                  key={o.token}
+                  onClick={() => void signIn(o.token)}
+                  className="rounded-lg border border-slate-300 p-2.5 text-left hover:border-emerald-600 focus:outline-none focus:ring-2 focus:ring-emerald-300"
+                >
+                  <div className="text-sm font-semibold">
+                    {o.label} <span className="font-normal text-slate-500">· caregiver</span>
+                  </div>
+                  <div className="text-xs text-slate-600">{o.sub}</div>
+                </button>
+              ))}
+            </div>
+            <p className="mt-3 text-xs text-slate-600">
+              Or <button onClick={() => setSignInOpen(false)} className="underline">continue without signing in</button>{" "}
+              — the assistant will ask for what it needs. Someone newly eligible has no account to
+              sign into, so that path has to work just as well.
+            </p>
+          </div>
+        )}
+
+        {identity && (
+          <div className="mb-4 rounded-xl border border-emerald-300 bg-emerald-50 px-3 py-2 text-xs text-emerald-900">
+            {identity.actingAs
+              ? `Signed in as ${identity.actingAs.name}, ${identity.actingAs.relationship} of ${identity.name}. You are viewing ${identity.firstName}'s account.`
+              : `Signed in as ${identity.name}.`}{" "}
+            {identity.currentPlanId ? (
+              <>
+                Current plan <code className="font-mono">{identity.currentPlanId}</code>
+                {identity.planEnding && <strong> — ending for 2027</strong>}. ZIP {identity.zip}.
+              </>
+            ) : (
+              <>No current Humana enrollment on file.</>
+            )}{" "}
+            The assistant already has this and will not ask you to repeat it.
+          </div>
+        )}
+
         {messages.length === 0 && (
           <div className="mb-6">
-            <p className="mb-3 text-sm text-slate-700">
+            <p className="mb-1 text-sm text-slate-700">
               Choose someone to start as, or just type a question below.
+            </p>
+            <p className="mb-3 text-xs text-slate-500">
+              {identity
+                ? "Signed in — the assistant already knows the plan, providers and medications on file."
+                : "Not signed in — the assistant will ask for what it needs before it can look anything up."}
             </p>
             <div className="grid gap-3 sm:grid-cols-2">
               {STARTERS.map((s) => (
@@ -312,6 +447,7 @@ export default function Home() {
                     answer={m.content}
                     toolsUsed={(m.trace ?? []).map((t) => t.tool)}
                     evidence={(m.trace ?? []).flatMap((t) => t.evidence ?? [])}
+                    identityEstablished={identity !== null}
                     uid={`m${i}`}
                     commit={build?.commit ?? "dev"}
                   />

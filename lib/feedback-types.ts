@@ -62,6 +62,15 @@ export type FeedbackEntry = {
   /** The exchange being judged. */
   question: string;
   answer: string;
+  /**
+   * Whether the conversation had an authenticated account behind it.
+   *
+   * Added after a triage pass INFERRED an authenticated session from the presence of a
+   * check_eligibility call and cleared an answer on that basis. It had no way to know.
+   * A judge reasoning from an absent signal will be confidently wrong at exactly the
+   * rate the signal is absent, so the signal is now recorded rather than guessed at.
+   */
+  identityEstablished?: boolean;
   /** Tools called, and any passages retrieved — what the answer was actually built from. */
   toolsUsed: string[];
   evidence: FeedbackEvidence[];
@@ -71,6 +80,56 @@ export type FeedbackEntry = {
   model: string;
   /** Populated once triaged. Absent until then. */
   analysis?: FeedbackAnalysis;
+  /** Populated once a human has decided what to do about it. */
+  action?: FeedbackAction;
+};
+
+/**
+ * What a reviewer decided to DO about a piece of feedback.
+ *
+ * Triage produces an opinion; this records a decision. Keeping them separate matters:
+ * the queue needs to distinguish "nobody has looked at this" from "someone looked and
+ * chose to do nothing", and only the second is actually closed.
+ */
+export type ActionKind = "none" | "golden_set" | "prompt_change" | "wont_fix" | "escalated";
+
+export type FeedbackAction = {
+  kind: ActionKind;
+  takenAt: string;
+  /** Free-text note from whoever actioned it. */
+  note?: string;
+  /** Snapshot of what was accepted, so the decision survives a later re-triage. */
+  accepted?: {
+    goldenSetCase?: FeedbackAnalysis["goldenSetCase"];
+    promptFix?: PromptFix;
+  };
+};
+
+/**
+ * A concrete, reviewable edit to the system prompt.
+ *
+ * Deliberately not applied automatically. A prompt is the behavioural specification of
+ * a regulated product; an agent editing it in response to one review, with no eval run
+ * and no human reading the diff, is how a system quietly drifts. So this is generated,
+ * shown, and staged — and a person merges it.
+ */
+export type PromptFix = {
+  /** Which part of lib/prompts.ts it belongs in, e.g. "How to be correct". */
+  section: string;
+  /** The rule to add, written in the voice of the existing prompt. */
+  rule: string;
+  /** Why this specific wording, and what it prevents. */
+  rationale: string;
+  /** How to tell it worked — the eval that should now pass. */
+  verification: string;
+};
+
+export const ACTION_LABELS: Record<ActionKind, string> = {
+  none: "No action yet",
+  golden_set: "Added to golden set",
+  prompt_change: "Prompt change staged",
+  wont_fix: "Reviewed — no change needed",
+  escalated: "Escalated for human decision",
 };
 
 export type FeedbackAnalysis = {
@@ -105,4 +164,9 @@ export type FeedbackAnalysis = {
   };
   /** Present only when the assessment disagrees with the reviewer. Says why, for a human to arbitrate. */
   disagreementNote?: string;
+  /**
+   * For feedback that reveals a genuine behavioural defect: the specific prompt rule
+   * that would prevent a recurrence. Staged for a human to merge, never auto-applied.
+   */
+  promptFix?: PromptFix;
 };

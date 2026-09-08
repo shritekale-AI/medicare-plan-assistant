@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import type { FeedbackEntry } from "@/lib/feedback-types";
+import { ACTION_LABELS, type ActionKind, type FeedbackEntry } from "@/lib/feedback-types";
 
 type Stats = {
   total: number;
@@ -12,9 +12,10 @@ type Stats = {
   disputed: number;
   blockers: number;
   goldenCandidates: number;
+  actioned: number;
 };
 
-type Filter = "all" | "down" | "up" | "pending" | "disputed" | "golden";
+type Filter = "all" | "down" | "up" | "pending" | "disputed" | "golden" | "open";
 
 const CATEGORY_LABEL: Record<string, string> = {
   retrieval_miss: "Retrieval miss",
@@ -55,6 +56,8 @@ export default function FeedbackAdmin() {
   const [busy, setBusy] = useState<string | null>(null);
   const [note, setNote] = useState<string | null>(null);
   const [loaded, setLoaded] = useState(false);
+  const [store, setStore] = useState<{ durable: boolean; location: string } | null>(null);
+  const [acting, setActing] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     try {
@@ -62,6 +65,7 @@ export default function FeedbackAdmin() {
       const data = await res.json();
       setEntries(data.entries ?? []);
       setStats(data.stats ?? null);
+      setStore(data.store ?? null);
     } catch {
       setNote("Could not load feedback.");
     } finally {
@@ -98,6 +102,28 @@ export default function FeedbackAdmin() {
     }
   }
 
+  async function act(id: string, kind: ActionKind) {
+    setActing(id + kind);
+    setNote(null);
+    try {
+      const res = await fetch("/api/feedback/action", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id, kind }),
+      });
+      const data = await res.json();
+      if (!res.ok) setNote(data.message ?? "Could not record that.");
+      else {
+        setNote("Recorded: " + ACTION_LABELS[kind] + ".");
+        await load();
+      }
+    } catch {
+      setNote("Could not reach the server.");
+    } finally {
+      setActing(null);
+    }
+  }
+
   const shown = entries.filter((e) => {
     switch (filter) {
       case "down":
@@ -110,6 +136,8 @@ export default function FeedbackAdmin() {
         return e.analysis?.agrees === false;
       case "golden":
         return Boolean(e.analysis?.goldenSetCase);
+      case "open":
+        return Boolean(e.analysis) && (!e.action || e.action.kind === "none");
       default:
         return true;
     }
@@ -122,6 +150,7 @@ export default function FeedbackAdmin() {
     { key: "pending", label: "Not triaged", count: stats?.pending },
     { key: "disputed", label: "Disputed", count: stats?.disputed },
     { key: "golden", label: "Golden candidates", count: stats?.goldenCandidates },
+    { key: "open", label: "Triaged, not actioned" },
   ];
 
   return (
@@ -148,6 +177,9 @@ export default function FeedbackAdmin() {
             >
               {busy === "all" ? "Analysing…" : `Triage all pending${stats?.pending ? ` (${stats.pending})` : ""}`}
             </button>
+            <a href="/api/feedback/action" target="_blank" rel="noreferrer" className="text-emerald-800 underline">
+              Export approved →
+            </a>
             <a href="/" className="text-emerald-800 underline">
               ← Assistant
             </a>
@@ -156,12 +188,21 @@ export default function FeedbackAdmin() {
       </header>
 
       <main className="mx-auto max-w-6xl px-4 py-5">
+        {store && !store.durable && (
+          <div role="note" className="mb-4 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-900">
+            <strong>Storage is ephemeral on this deployment.</strong> Writes go to the instance temp
+            directory and are lost when it recycles, so treat anything submitted here as a demo
+            rather than a record. Real UAT needs a durable store &mdash; set{" "}
+            <code>FEEDBACK_STORE_PATH</code> to a mounted volume, or swap the two IO functions in{" "}
+            <code>lib/feedback.ts</code> for a database client.
+          </div>
+        )}
         {/* Blockers and disputes lead, because those are the two that need a human. */}
         <div className="mb-5 grid grid-cols-2 gap-3 sm:grid-cols-4">
           <Card label="Needs a decision" value={(stats?.blockers ?? 0) + (stats?.disputed ?? 0)} tone="alert" />
           <Card label="Disputed by triage" value={stats?.disputed ?? 0} tone="warn" />
           <Card label="Not yet triaged" value={stats?.pending ?? 0} tone="plain" />
-          <Card label="Golden-set candidates" value={stats?.goldenCandidates ?? 0} tone="good" />
+          <Card label="Actioned" value={stats?.actioned ?? 0} tone="good" />
         </div>
 
         <div className="mb-3 flex flex-wrap gap-1.5">
@@ -349,12 +390,74 @@ export default function FeedbackAdmin() {
 )}
                             </pre>
                             <p className="mt-1 text-[11px] text-emerald-800">
-                              Paste into <code>evals/golden-set.json</code>. This is what
-                              &ldquo;reinforcement&rdquo; means here — a regression test, not a
-                              weight update.
+                              This is what &ldquo;reinforcement&rdquo; means here — a regression
+                              test, not a weight update.
                             </p>
                           </div>
                         )}
+
+                        {a.promptFix && (
+                          <div className="mt-2 rounded border border-sky-300 bg-sky-50 p-2">
+                            <p className="font-medium text-sky-900">
+                              Proposed prompt change &mdash; stop it happening again
+                            </p>
+                            <p className="mt-0.5 text-sky-900">
+                              Section: <strong>{a.promptFix.section}</strong>
+                            </p>
+                            <pre className="mt-1.5 overflow-x-auto whitespace-pre-wrap rounded bg-white p-2 text-[11px] text-slate-800">
+{a.promptFix.rule}
+                            </pre>
+                            <p className="mt-1 text-sky-900">{a.promptFix.rationale}</p>
+                            <p className="mt-1 text-[11px] text-sky-800">
+                              Verify: {a.promptFix.verification}
+                            </p>
+                          </div>
+                        )}
+
+                        {/* Actions record a DECISION and stage an artifact. They never edit
+                            the golden set or the prompt directly &mdash; a human merges those. */}
+                        <div className="mt-3 border-t border-slate-300 pt-2">
+                          {e.action && e.action.kind !== "none" ? (
+                            <p className="text-emerald-900">
+                              <strong>{ACTION_LABELS[e.action.kind]}</strong>{" "}
+                              <span className="text-slate-500">
+                                &middot; {new Date(e.action.takenAt).toLocaleString()}
+                              </span>
+                            </p>
+                          ) : (
+                            <div className="flex flex-wrap items-center gap-1.5">
+                              <span className="mr-1 text-slate-600">Action:</span>
+                              {a.goldenSetCase && (
+                                <ActionButton
+                                  label="Add to golden set"
+                                  busy={acting === e.id + "golden_set"}
+                                  tone="good"
+                                  onClick={() => void act(e.id, "golden_set")}
+                                />
+                              )}
+                              {a.promptFix && (
+                                <ActionButton
+                                  label="Stage prompt change"
+                                  busy={acting === e.id + "prompt_change"}
+                                  tone="info"
+                                  onClick={() => void act(e.id, "prompt_change")}
+                                />
+                              )}
+                              <ActionButton
+                                label="No change needed"
+                                busy={acting === e.id + "wont_fix"}
+                                tone="plain"
+                                onClick={() => void act(e.id, "wont_fix")}
+                              />
+                              <ActionButton
+                                label="Escalate"
+                                busy={acting === e.id + "escalated"}
+                                tone="warn"
+                                onClick={() => void act(e.id, "escalated")}
+                              />
+                            </div>
+                          )}
+                        </div>
                       </div>
                     )}
                   </div>
@@ -365,6 +468,31 @@ export default function FeedbackAdmin() {
         </div>
       </main>
     </div>
+  );
+}
+
+function ActionButton({
+  label, busy, tone, onClick,
+}: {
+  label: string;
+  busy: boolean;
+  tone: "good" | "info" | "warn" | "plain";
+  onClick: () => void;
+}) {
+  const styles = {
+    good: "border-emerald-400 bg-emerald-50 text-emerald-900 hover:bg-emerald-100",
+    info: "border-sky-400 bg-sky-50 text-sky-900 hover:bg-sky-100",
+    warn: "border-amber-400 bg-amber-50 text-amber-900 hover:bg-amber-100",
+    plain: "border-slate-300 bg-white text-slate-700 hover:bg-slate-100",
+  }[tone];
+  return (
+    <button
+      onClick={onClick}
+      disabled={busy}
+      className={"rounded border px-2 py-1 text-[11px] font-medium disabled:opacity-50 " + styles}
+    >
+      {busy ? "Saving\u2026" : label}
+    </button>
   );
 }
 

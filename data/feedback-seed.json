@@ -1,0 +1,153 @@
+[
+  {
+    "id": "fb_seed_identity",
+    "createdAt": "2026-09-07T14:20:00.000Z",
+    "rating": "down",
+    "reviewerRole": "uat",
+    "comment": "How did the app know who Linda is and what plan she has? Shouldn't it ask for details first to fetch the plan data?",
+    "question": "I got a letter saying my Humana plan won't be offered next year. I'm 68, I live in 28270, and I really need to keep seeing my cardiologist. I don't know where to start.",
+    "answer": "I'm sorry — that letter is unsettling to get, but this is manageable and you have time. Your current plan, H1036-318, is being discontinued for 2027, which opens a special enrollment window for you. Since you want to keep seeing your cardiologist, let me check which of the plans available in 28270 keep Dr. Reddy in network. I'll also make sure whatever we look at covers your four medications.",
+    "toolsUsed": [
+      "check_eligibility",
+      "search_plans",
+      "check_provider_network"
+    ],
+    "evidence": [],
+    "commit": "8f0de46",
+    "corpusVersion": "a45f21dfdd1cb5f8",
+    "model": "claude-sonnet-5",
+    "identityEstablished": false
+  },
+  {
+    "id": "fb_seed_refusal",
+    "createdAt": "2026-09-07T13:05:00.000Z",
+    "rating": "down",
+    "reviewerRole": "compliance",
+    "comment": "The assistant refused to tell the member which plan was best for her. It should just answer the question directly instead of deflecting to an agent.",
+    "question": "Which of these two plans is best for me?",
+    "answer": "I can't pick one for you — that's a licensed advocate's call. What I can do is lay out how they differ on the things you told me matter. H5525-050 has a $250 medical deductible; H1036-318 has none. Both keep Dr. Reddy in network, though that has to be re-confirmed at enrollment. Would you like me to connect you with a licensed advocate who can make an actual recommendation?",
+    "toolsUsed": [
+      "compare_plans",
+      "check_provider_network"
+    ],
+    "evidence": [],
+    "commit": "8f0de46",
+    "corpusVersion": "a45f21dfdd1cb5f8",
+    "model": "claude-sonnet-5",
+    "identityEstablished": true
+  },
+  {
+    "id": "fb_seed_formulary",
+    "createdAt": "2026-09-07T11:40:00.000Z",
+    "rating": "down",
+    "reviewerRole": "clinical",
+    "comment": "Member asked what her Eliquis would cost and got a tier explanation instead of a price. This is the single most common question we get and we can't answer it.",
+    "question": "What will my Eliquis cost on this plan?",
+    "answer": "I wasn't able to find Eliquis in this plan's documents, so I don't want to guess at a price — drug costs depend on which tier a medication falls into, and that varies by plan. What I can tell you is that this plan has a $0 prescription deductible, so cost-sharing starts from your first fill. For the actual amount, a licensed advocate can look it up against the current formulary while you're on the phone. Shall I arrange that?",
+    "toolsUsed": [
+      "search_plan_documents",
+      "get_plan_details"
+    ],
+    "evidence": [
+      {
+        "document": "Summary of Benefits",
+        "page": 12,
+        "text": "Prescription drug deductible: $0. You pay the following until your total out-of-pocket costs reach the catastrophic coverage limit. Tier 1 Preferred Generic: $0 copay at preferred retail. Tier 3 Preferred Brand: $47 copay. Tier 4 Non-Preferred Drug: 40% coinsurance."
+      }
+    ],
+    "commit": "8f0de46",
+    "corpusVersion": "a45f21dfdd1cb5f8",
+    "model": "claude-sonnet-5",
+    "identityEstablished": true
+  },
+  {
+    "id": "fb_seed_tone",
+    "createdAt": "2026-09-07T10:15:00.000Z",
+    "rating": "down",
+    "reviewerRole": "member",
+    "comment": "Too much at once. My mother would have stopped reading at the third paragraph. She wanted to know if she keeps her doctor, not a lecture on network types.",
+    "question": "Do I get to keep my cardiologist?",
+    "answer": "Great question. Dr. Reddy is in network for four of the plans available to you. It's worth understanding what network type means here: an HMO generally requires you to stay within the plan's network except in emergencies, while a PPO allows out-of-network care at a higher cost share. Of the four plans that keep Dr. Reddy, two are HMOs and two are PPOs. The HMO options have lower premiums but less flexibility if you travel. There are also differences in specialist copays, ranging from $35 to $50, and in whether a referral is required before you see a specialist. Network participation should be re-confirmed at enrollment because provider networks change throughout the year.",
+    "toolsUsed": [
+      "check_provider_network",
+      "search_plans"
+    ],
+    "evidence": [],
+    "commit": "8f0de46",
+    "corpusVersion": "a45f21dfdd1cb5f8",
+    "model": "claude-sonnet-5",
+    "identityEstablished": true
+  },
+  {
+    "id": "fb_seed_referral",
+    "createdAt": "2026-09-07T09:30:00.000Z",
+    "rating": "up",
+    "reviewerRole": "uat",
+    "comment": "Good — it cited the page and did not guess when the document did not cover the out-of-network case.",
+    "question": "Do I need a referral before seeing a specialist?",
+    "answer": "For this plan you do not need a referral to see an in-network specialist. That's in the plan's Evidence of Coverage on page 41. One thing I could not confirm from the documents is whether the same applies to out-of-network specialists — a licensed advocate can check that for you.",
+    "toolsUsed": [
+      "search_plan_documents"
+    ],
+    "evidence": [
+      {
+        "document": "Evidence of Coverage",
+        "page": 41,
+        "text": "You do not need a referral from your primary care provider to see an in-network specialist. Some services require prior authorization from the plan before you receive them."
+      }
+    ],
+    "commit": "8f0de46",
+    "corpusVersion": "a45f21dfdd1cb5f8",
+    "model": "claude-sonnet-5",
+    "identityEstablished": true
+  },
+  {
+    "id": "fb_seed_urgency",
+    "createdAt": "2026-09-06T16:45:00.000Z",
+    "rating": "down",
+    "reviewerRole": "legal",
+    "comment": "\"You need to act quickly or you could be left without coverage\" reads as manufactured urgency. CMS marketing rules are specific about pressure tactics. Remove it.",
+    "question": "How long do I have to decide?",
+    "answer": "You have until December 7 to choose a plan for coverage starting January 1. Because your plan is being discontinued you may also have a special enrollment period that extends past that date. You need to act quickly or you could be left without coverage on January 1, so I'd recommend deciding soon.",
+    "toolsUsed": [
+      "check_eligibility"
+    ],
+    "evidence": [],
+    "commit": "8f0de46",
+    "corpusVersion": "a45f21dfdd1cb5f8",
+    "model": "claude-sonnet-5",
+    "identityEstablished": true
+  },
+  {
+    "id": "fb_seed_medical",
+    "createdAt": "2026-09-06T15:10:00.000Z",
+    "rating": "up",
+    "reviewerRole": "compliance",
+    "comment": "Correctly declined to advise on a medication question and routed to the prescriber. This is exactly the boundary we want held.",
+    "question": "My cardiologist wants to switch me to a different blood thinner. Should I do it?",
+    "answer": "That's a question for your cardiologist rather than me — I'm not able to give medical advice, and I wouldn't want to be a voice in a decision like that. What I can do is help with the coverage side once you know which medication you'd be on: I can check how it's covered under each plan you're considering, so cost isn't the thing that makes the decision for you.",
+    "toolsUsed": [],
+    "evidence": [],
+    "commit": "8f0de46",
+    "corpusVersion": "a45f21dfdd1cb5f8",
+    "model": "claude-sonnet-5",
+    "identityEstablished": true
+  },
+  {
+    "id": "fb_seed_wrongplan",
+    "createdAt": "2026-09-06T14:00:00.000Z",
+    "rating": "down",
+    "reviewerRole": "broker",
+    "comment": "The copay it quoted belongs to a different plan than the one being discussed. I checked the Summary of Benefits — this plan is $50, not $35. If I'd read that to a client I'd have had a problem.",
+    "question": "What's the specialist copay on H5525-083?",
+    "answer": "The specialist copay on that plan is $35 per visit. Primary care visits are $0. There's no referral required to see a specialist in network.",
+    "toolsUsed": [
+      "get_plan_details"
+    ],
+    "evidence": [],
+    "commit": "8f0de46",
+    "corpusVersion": "a45f21dfdd1cb5f8",
+    "model": "claude-sonnet-5",
+    "identityEstablished": true
+  }
+]

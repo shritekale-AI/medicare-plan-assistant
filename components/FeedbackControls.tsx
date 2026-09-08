@@ -10,6 +10,7 @@ type Props = {
   answer: string;
   toolsUsed: string[];
   evidence: { document: string; page: number; text: string }[];
+  identityEstablished: boolean;
   commit: string;
 };
 
@@ -26,7 +27,7 @@ type Props = {
  * compliance reviewer's objection is a release gate, a UAT tester's is a bug, and a
  * member's is a signal about clarity. Same rating, different queue.
  */
-export function FeedbackControls({ uid, question, answer, toolsUsed, evidence, commit }: Props) {
+export function FeedbackControls({ uid, question, answer, toolsUsed, evidence, identityEstablished, commit }: Props) {
   const [rating, setRating] = useState<Rating | null>(null);
   const [comment, setComment] = useState("");
   const [role, setRole] = useState<ReviewerRole>("uat");
@@ -45,7 +46,7 @@ export function FeedbackControls({ uid, question, answer, toolsUsed, evidence, c
       const res = await fetch("/api/feedback", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ rating, comment, reviewerRole: role, question, answer, toolsUsed, evidence, commit }),
+        body: JSON.stringify({ rating, comment, reviewerRole: role, question, answer, toolsUsed, evidence, identityEstablished, commit }),
       });
       const data = await res.json();
       if (!res.ok) {

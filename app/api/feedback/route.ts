@@ -4,6 +4,8 @@ import { corpusStats } from "@/lib/retrieval";
 import {
   appendFeedback,
   feedbackStats,
+  storeIsDurable,
+  storeLocation,
   newId,
   readFeedback,
   REVIEWER_ROLES,
@@ -36,6 +38,7 @@ export async function POST(req: Request) {
     question?: string;
     answer?: string;
     toolsUsed?: string[];
+    identityEstablished?: boolean;
     evidence?: FeedbackEvidence[];
     commit?: string;
   };
@@ -69,6 +72,7 @@ export async function POST(req: Request) {
     reviewerRole: role,
     question: (body.question ?? "").slice(0, MAX_COMMENT),
     answer: body.answer.slice(0, 20_000),
+    identityEstablished: Boolean(body.identityEstablished),
     toolsUsed: Array.isArray(body.toolsUsed) ? body.toolsUsed.slice(0, 20) : [],
     evidence: Array.isArray(body.evidence) ? body.evidence.slice(0, 8) : [],
     commit: body.commit ?? "unknown",
@@ -94,5 +98,10 @@ export async function POST(req: Request) {
 /** GET — the admin list, newest first, with a roll-up. */
 export async function GET() {
   const entries = readFeedback();
-  return NextResponse.json({ entries, stats: feedbackStats(entries) });
+  return NextResponse.json({
+    entries,
+    stats: feedbackStats(entries),
+    // Surfaced so the console can warn rather than silently losing submissions.
+    store: { durable: storeIsDurable(), location: storeLocation() },
+  });
 }
