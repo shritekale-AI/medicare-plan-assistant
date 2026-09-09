@@ -3,6 +3,17 @@
 import { useCallback, useEffect, useState } from "react";
 import { ACTION_LABELS, type ActionKind, type FeedbackEntry } from "@/lib/feedback-types";
 
+type LearnedRule = {
+  id: string;
+  createdAt: string;
+  section: string;
+  rule: string;
+  rationale: string;
+  verification: string;
+  fromFeedback: string;
+  reviewerRole: string;
+};
+
 type Stats = {
   total: number;
   up: number;
@@ -58,6 +69,8 @@ export default function FeedbackAdmin() {
   const [loaded, setLoaded] = useState(false);
   const [store, setStore] = useState<{ durable: boolean; location: string } | null>(null);
   const [acting, setActing] = useState<string | null>(null);
+  const [rules, setRules] = useState<LearnedRule[]>([]);
+  const [rulesDurable, setRulesDurable] = useState(true);
 
   const load = useCallback(async () => {
     try {
@@ -66,6 +79,9 @@ export default function FeedbackAdmin() {
       setEntries(data.entries ?? []);
       setStats(data.stats ?? null);
       setStore(data.store ?? null);
+      const applied = await (await fetch("/api/feedback/action")).json();
+      setRules(applied.learnedRules ?? []);
+      setRulesDurable(applied.durable !== false);
     } catch {
       setNote("Could not load feedback.");
     } finally {
@@ -84,7 +100,12 @@ export default function FeedbackAdmin() {
       const res = await fetch("/api/feedback/analyze", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(id ? { id } : { all: true }),
+        // Send the entry inline. On serverless the store is per-instance, so a lookup
+        // by id can land on an instance that has never seen it — which is what made
+        // this button look broken while every request behaved correctly.
+        body: JSON.stringify(
+          id ? { id, entry: entries.find((e) => e.id === id) } : { all: true }
+        ),
       });
       const data = await res.json();
       if (!res.ok) {
@@ -109,14 +130,32 @@ export default function FeedbackAdmin() {
       const res = await fetch("/api/feedback/action", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ id, kind }),
+        body: JSON.stringify({ id, kind, entry: entries.find((e) => e.id === id) }),
       });
       const data = await res.json();
       if (!res.ok) setNote(data.message ?? "Could not record that.");
       else {
-        setNote("Recorded: " + ACTION_LABELS[kind] + ".");
+        setNote(
+          data.applied
+            ? `Applied \u2014 ${data.applied.active} correction${data.applied.active === 1 ? "" : "s"} now active. The assistant follows this from its next answer.`
+            : "Recorded: " + ACTION_LABELS[kind] + "."
+        );
         await load();
       }
+    } catch {
+      setNote("Could not reach the server.");
+    } finally {
+      setActing(null);
+    }
+  }
+
+  async function revoke(id: string) {
+    setActing("revoke" + id);
+    try {
+      const res = await fetch("/api/feedback/action?id=" + encodeURIComponent(id), { method: "DELETE" });
+      const data = await res.json();
+      setNote(data.ok ? `Rule revoked. ${data.remaining} still active.` : "Could not revoke that rule.");
+      await load();
     } catch {
       setNote("Could not reach the server.");
     } finally {
@@ -197,6 +236,61 @@ export default function FeedbackAdmin() {
             <code>lib/feedback.ts</code> for a database client.
           </div>
         )}
+        {/* What the loop has actually changed. Listed first because a self-modifying
+            system whose modifications are invisible is the thing nobody should ship. */}
+        <section className="mb-5 rounded-xl border border-sky-300 bg-sky-50 p-3">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <h2 className="text-sm font-semibold text-sky-900">
+              Active corrections{" "}
+              <span className="font-normal text-sky-800">
+                &middot; {rules.length} rule{rules.length === 1 ? "" : "s"} appended to the assistant&rsquo;s prompt right now
+              </span>
+            </h2>
+            {!rulesDurable && (
+              <span className="rounded border border-amber-300 bg-amber-50 px-1.5 py-0.5 text-[11px] text-amber-900">
+                Instance-scoped &mdash; commit data/learned-rules.json to make permanent
+              </span>
+            )}
+          </div>
+
+          {rules.length === 0 ? (
+            <p className="mt-1.5 text-xs text-sky-900">
+              None yet. Accepting a proposed correction on a piece of feedback adds it here, and it
+              takes effect on the assistant&rsquo;s next answer.
+            </p>
+          ) : (
+            <ul className="mt-2 space-y-1.5">
+              {rules.map((r) => (
+                <li key={r.id} className="rounded border border-sky-200 bg-white p-2 text-xs">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="whitespace-pre-wrap text-slate-800">{r.rule}</p>
+                      <p className="mt-1 text-[11px] text-slate-500">
+                        {r.section} &middot; from {r.reviewerRole} feedback {r.fromFeedback} &middot;{" "}
+                        {new Date(r.createdAt).toLocaleString()}
+                      </p>
+                      <p className="mt-0.5 text-[11px] text-slate-600">{r.rationale}</p>
+                    </div>
+                    <button
+                      onClick={() => void revoke(r.id)}
+                      disabled={acting !== null}
+                      className="shrink-0 rounded border border-slate-300 bg-white px-2 py-1 text-[11px] text-slate-700 hover:bg-slate-100 disabled:opacity-50"
+                    >
+                      {acting === "revoke" + r.id ? "Revoking\u2026" : "Revoke"}
+                    </button>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          )}
+
+          <p className="mt-2 text-[11px] text-sky-800">
+            Corrections refine behaviour inside existing limits. They cannot move a boundary &mdash;
+            rule text that tries to is rejected before it is stored, and the overlay tells the model
+            that the boundaries above it win.
+          </p>
+        </section>
+
         {/* Blockers and disputes lead, because those are the two that need a human. */}
         <div className="mb-5 grid grid-cols-2 gap-3 sm:grid-cols-4">
           <Card label="Needs a decision" value={(stats?.blockers ?? 0) + (stats?.disputed ?? 0)} tone="alert" />

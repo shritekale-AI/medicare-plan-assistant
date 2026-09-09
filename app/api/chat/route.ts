@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { TOOLS, executeTool } from "@/lib/tools";
 import { SYSTEM_PROMPT } from "@/lib/prompts";
 import { identityContext, resolveIdentity } from "@/lib/members";
+import { learnedRulesBlock } from "@/lib/learned";
 import { MODELS, GENERATION, LIMITS } from "@/lib/config";
 import { compactConversation } from "@/lib/summarize";
 
@@ -85,9 +86,16 @@ export async function POST(req: Request) {
   // and medications would be a client that could put words in the account's mouth.
   // When there is no token the prompt requires the assistant to ask rather than assume.
   const identity = resolveIdentity(body.identityToken);
-  const systemPrompt = identity
-    ? `${SYSTEM_PROMPT}\n\n${identityContext(identity)}`
-    : SYSTEM_PROMPT;
+
+  // Rules a reviewer flagged and a human accepted are appended here, so an accepted
+  // correction takes effect on the very next turn rather than waiting for a deploy.
+  // The overlay is subordinate to everything above it and cannot move a boundary —
+  // see lib/learned.ts for the containment argument.
+  const systemPrompt = [
+    SYSTEM_PROMPT,
+    identity ? identityContext(identity) : "",
+    learnedRulesBlock(),
+  ].filter(Boolean).join("\n\n");
 
   const incoming = body.messages ?? [];
   if (incoming.length === 0) {

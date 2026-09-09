@@ -1,8 +1,10 @@
 import { NextResponse } from "next/server";
 import { MODELS } from "@/lib/config";
 import { corpusStats } from "@/lib/retrieval";
+import { runTriage } from "@/lib/triage";
 import {
   appendFeedback,
+  updateFeedback,
   feedbackStats,
   storeIsDurable,
   storeLocation,
@@ -16,6 +18,7 @@ import {
 } from "@/lib/feedback";
 
 export const runtime = "nodejs";
+export const maxDuration = 60;
 
 const MAX_COMMENT = 4000;
 const VALID_ROLES = new Set(REVIEWER_ROLES.map((r) => r.value));
@@ -92,7 +95,29 @@ export async function POST(req: Request) {
     );
   }
 
-  return NextResponse.json({ ok: true, id: entry.id });
+  // Triage inline. The reviewer who just wrote the comment is the person best placed
+  // to judge whether the assessment is right, and they are here now — asking them to
+  // open a console later gets nothing. It also removes the dependency on a second
+  // request finding state the first one left behind, which is what made the console's
+  // triage button appear broken on serverless.
+  const apiKey = process.env.ANTHROPIC_API_KEY;
+  if (!apiKey) {
+    return NextResponse.json({ ok: true, id: entry.id, entry, triage: null });
+  }
+
+  const result = await runTriage(entry, apiKey);
+  if (!result.ok) {
+    return NextResponse.json({ ok: true, id: entry.id, entry, triage: null, triageError: result.reason });
+  }
+
+  const analysed = { ...entry, analysis: result.analysis };
+  try {
+    updateFeedback(entry.id, { analysis: result.analysis });
+  } catch {
+    /* ephemeral store — the response carries the analysis */
+  }
+
+  return NextResponse.json({ ok: true, id: entry.id, entry: analysed, triage: result.analysis });
 }
 
 /** GET — the admin list, newest first, with a roll-up. */
