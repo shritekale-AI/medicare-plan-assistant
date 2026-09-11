@@ -258,8 +258,11 @@ export default function Home() {
       </div>
 
       <header className="border-b border-slate-200 bg-white px-4 py-4">
-        <div className="mx-auto flex max-w-4xl items-center justify-between gap-4">
-          <div>
+        {/* flex-wrap, not a fixed row: the right-hand cluster is five items and its
+            min-content width exceeds a 375px viewport, which scrolls the whole page
+            sideways on a phone. min-w-0 lets the title block shrink rather than push. */}
+        <div className="mx-auto flex max-w-4xl flex-wrap items-center justify-between gap-x-4 gap-y-2">
+          <div className="min-w-0">
             <h1 className="text-base font-semibold">Medicare Plan Assistant</h1>
             <p className="text-xs text-slate-600">
               21 plans · Mecklenburg County, NC (28270) · plan year 2026
@@ -391,7 +394,7 @@ export default function Home() {
         {messages.length === 0 && (
           <div className="mb-6">
             <p className="mb-1 text-sm text-slate-700">
-              Choose someone to start as, or just type a question below.
+              Try one of these, or just type a question below.
             </p>
             <p className="mb-3 text-xs text-slate-500">
               {identity
@@ -408,9 +411,13 @@ export default function Home() {
                   }}
                   className="rounded-xl border-2 border-slate-300 bg-white p-3 text-left transition hover:border-emerald-600 hover:shadow-md focus:outline-none focus:ring-4 focus:ring-emerald-300"
                 >
-                  <div className="text-sm font-semibold">{s.name}</div>
-                  <div className="text-xs text-slate-700">{s.role}</div>
-                  <div className="mt-0.5 text-xs text-emerald-800">{s.mode}</div>
+                  <div className="text-xs font-semibold text-slate-600">
+                    {s.name}
+                    {s.id === "linda" && (
+                      <span className="font-normal text-emerald-800"> · reads answers aloud</span>
+                    )}
+                  </div>
+                  <div className="mt-1 text-sm text-slate-800">&ldquo;{s.prompt}&rdquo;</div>
                 </button>
               ))}
             </div>
@@ -511,7 +518,7 @@ export default function Home() {
               onClick={() => fileRef.current?.click()}
               aria-label="Attach a photo of your letter"
               title="Attach a photo of your letter"
-              className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-slate-200 text-2xl text-slate-800 transition hover:bg-slate-300 focus:outline-none focus:ring-4 focus:ring-emerald-300"
+              className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-slate-200 text-xl text-slate-800 transition hover:bg-slate-300 focus:outline-none focus:ring-4 focus:ring-emerald-300 sm:h-14 sm:w-14 sm:text-2xl"
             >
               <span aria-hidden="true">📄</span>
             </button>
@@ -521,7 +528,7 @@ export default function Home() {
                 onClick={handleMic}
                 aria-label={listening ? "Stop listening" : "Speak your question"}
                 aria-pressed={listening}
-                className={`flex h-14 w-14 shrink-0 items-center justify-center rounded-full text-2xl transition focus:outline-none focus:ring-4 focus:ring-emerald-300 ${
+                className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-xl transition focus:outline-none focus:ring-4 focus:ring-emerald-300 sm:h-14 sm:w-14 sm:text-2xl ${
                   listening
                     ? "bg-red-700 text-white motion-safe:animate-pulse"
                     : "bg-slate-200 text-slate-800 hover:bg-slate-300"
@@ -546,15 +553,21 @@ export default function Home() {
                   void send(input);
                 }
               }}
-              placeholder={listening ? "Listening…" : "Type your question…"}
+              /* Short on purpose: at 16px in a ~175px box on a 375px phone, "Type your
+                 question…" wraps to a second line and clips. The full wording lives in
+                 the visually-hidden label above, so nothing is lost for screen readers. */
+              placeholder={listening ? "Listening…" : "Your question…"}
               rows={1}
-              className="min-h-12 flex-1 resize-none rounded-xl border-2 border-slate-400 px-3 py-2.5 text-sm focus:border-emerald-700 focus:outline-none focus:ring-4 focus:ring-emerald-200"
+              /* text-base, not text-sm: iOS Safari zooms the viewport on focus of any
+                 input under 16px and does not zoom back out on blur, so one tap on the
+                 message box leaves the whole app oversized. */
+              className="min-h-12 flex-1 resize-none rounded-xl border-2 border-slate-400 px-3 py-2.5 text-base focus:border-emerald-700 focus:outline-none focus:ring-4 focus:ring-emerald-200"
             />
 
             <button
               onClick={() => void send(input)}
               disabled={loading || (!input.trim() && !attachment)}
-              className="h-12 shrink-0 rounded-xl bg-emerald-800 px-5 text-sm font-medium text-white focus:outline-none focus:ring-4 focus:ring-emerald-300 disabled:opacity-50"
+              className="h-12 shrink-0 rounded-xl bg-emerald-800 px-3 text-sm font-medium text-white focus:outline-none focus:ring-4 focus:ring-emerald-300 disabled:opacity-50 sm:px-5"
             >
               Send
             </button>

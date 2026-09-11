@@ -86,7 +86,7 @@ export default function BrokerPage() {
 
   if (!signedIn) {
     return (
-      <div className="min-h-screen bg-slate-100">
+      <div className="min-h-screen bg-slate-100 text-slate-900">
         <Banner />
         <div className="mx-auto max-w-md px-4 py-20">
           <div className="rounded-2xl border-2 border-slate-200 bg-white p-8">

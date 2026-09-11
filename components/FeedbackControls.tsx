@@ -243,10 +243,11 @@ export function FeedbackControls({
             value={comment}
             onChange={(e) => setComment(e.target.value)}
             rows={2}
-            className="mt-1 w-full resize-none rounded border border-slate-300 px-2 py-1 text-xs focus:border-emerald-600 focus:outline-none focus:ring-2 focus:ring-emerald-200"
+            /* 16px minimum — anything smaller triggers iOS Safari's zoom-on-focus. */
+            className="mt-1 w-full resize-none rounded border border-slate-300 px-2 py-1.5 text-base focus:border-emerald-600 focus:outline-none focus:ring-2 focus:ring-emerald-200 sm:text-xs"
             placeholder={
               rating === "up"
-                ? "e.g. correctly refused to recommend, cited the page"
+                ? "e.g. named a clear best fit and still routed to a licensed advocate; cited the page"
                 : "e.g. quoted the wrong plan's copay; the page cited doesn't say this"
             }
           />
@@ -258,7 +259,7 @@ export function FeedbackControls({
               id={`fb-role-${uid}`}
               value={role}
               onChange={(e) => setRole(e.target.value as ReviewerRole)}
-              className="rounded border border-slate-300 px-1.5 py-1 text-xs"
+              className="rounded border border-slate-300 px-1.5 py-1 text-base sm:text-xs"
             >
               {REVIEWER_ROLES.map((r) => (
                 <option key={r.value} value={r.value}>

@@ -12,12 +12,13 @@
   --font-mono: var(--font-geist-mono);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
-}
+/* No dark-mode override, deliberately.
+   This is the create-next-app default and it was actively wrong here: every screen
+   paints its own light surfaces (bg-white, bg-slate-100), so flipping only the body
+   tokens left near-black showing through on overscroll — visible mainly on phones,
+   which are far likelier to be in dark mode — and made any element without an
+   explicit text colour near-white on a white card. Committing to one light theme is
+   honest; a real dark mode means auditing every surface, which is not done. */
 
 body {
   background: var(--background);
